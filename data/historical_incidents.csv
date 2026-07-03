@@ -1,0 +1,7 @@
+incident_id,date,equipment,alarm_code,root_cause,corrective_action
+H001,2026-06-01,Etcher-03,RF101,Loose RF cable,Tightened RF connector and verified reflected power
+H002,2026-06-08,Etcher-03,RF101,RF generator drift,Recalibrated RF generator
+H003,2026-06-10,CMP-02,CMP205,Pressure sensor noise,Replaced pressure sensor
+H004,2026-06-12,CVD-05,GAS012,MFC calibration drift,Calibrated MFC and held affected lot
+H005,2026-06-15,Litho-01,ALIGN011,Dirty alignment camera,Cleaned camera and reran calibration
+H006,2026-06-18,PVD-02,VAC033,Door seal leak,Reseated door seal and passed leak check

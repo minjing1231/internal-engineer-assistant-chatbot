@@ -1,0 +1,9 @@
+alarm_code,description,severity
+RF101,RF Power Instability,High
+CMP205,Pad Pressure Low,Medium
+GAS012,Gas Flow Deviation,High
+ALIGN011,Wafer Alignment Failure,Low
+TEMP008,Chamber Temperature High,Medium
+VAC033,Vacuum Pressure High,High
+ROBOT017,Wafer Transfer Error,Medium
+PART090,Particle Count High,High

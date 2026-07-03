@@ -1,0 +1,6 @@
+equipment_id,equipment_name,tool_type,area,status
+EQ001,Etcher-03,Plasma Etcher,Etch,Active
+EQ002,CMP-02,CMP Tool,CMP,Active
+EQ003,CVD-05,PECVD Tool,Deposition,Active
+EQ004,Litho-01,Lithography Scanner,Lithography,Active
+EQ005,PVD-02,PVD Tool,Deposition,Active

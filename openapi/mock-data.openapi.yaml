@@ -1,0 +1,323 @@
+openapi: 3.1.0
+info:
+  title: Mock Data Service
+  version: 0.1.0
+  description: Structured mock equipment, alarm, and historical incident data API.
+servers:
+  - url: http://localhost:8003
+    description: Local host
+  - url: http://mock-data:8003
+    description: Docker network
+tags:
+  - name: equipment
+    description: Equipment master data
+  - name: alarms
+    description: Alarm reference data
+  - name: incidents
+    description: Historical incident data
+  - name: lookup
+    description: Combined context lookup
+  - name: health
+    description: Service health checks
+paths:
+  /equipment/{equipment_name}:
+    get:
+      tags:
+        - equipment
+      summary: Get equipment by name
+      operationId: getEquipment
+      parameters:
+        - name: equipment_name
+          in: path
+          required: true
+          schema:
+            type: string
+          example: Etcher-03
+      responses:
+        "200":
+          description: Equipment found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Equipment"
+        "404":
+          description: Equipment not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /alarms/{alarm_code}:
+    get:
+      tags:
+        - alarms
+      summary: Get alarm by code
+      operationId: getAlarm
+      parameters:
+        - name: alarm_code
+          in: path
+          required: true
+          schema:
+            type: string
+          example: RF101
+      responses:
+        "200":
+          description: Alarm found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alarm"
+        "404":
+          description: Alarm not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /incidents:
+    get:
+      tags:
+        - incidents
+      summary: Search historical incidents
+      operationId: searchIncidents
+      parameters:
+        - name: equipment
+          in: query
+          required: false
+          schema:
+            type:
+              - string
+              - "null"
+          example: Etcher-03
+        - name: alarm_code
+          in: query
+          required: false
+          schema:
+            type:
+              - string
+              - "null"
+          example: RF101
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 5
+      responses:
+        "200":
+          description: Matching incidents.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentList"
+  /lookup:
+    post:
+      tags:
+        - lookup
+      summary: Combined equipment, alarm, and incident lookup
+      description: Reduces service-to-service round trips for the Chat API Service.
+      operationId: lookupContext
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LookupRequest"
+            example:
+              equipment: Etcher-03
+              alarm_code: RF101
+              include_incidents: true
+              incident_limit: 5
+      responses:
+        "200":
+          description: Lookup completed. Missing records are reported in the response body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupResponse"
+        "400":
+          description: Neither equipment nor alarm code provided.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /health:
+    get:
+      tags:
+        - health
+      summary: Get service health
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service health.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+components:
+  schemas:
+    Equipment:
+      type: object
+      required:
+        - equipment_id
+        - equipment_name
+        - tool_type
+        - area
+        - status
+      properties:
+        equipment_id:
+          type: string
+          example: EQ001
+        equipment_name:
+          type: string
+          example: Etcher-03
+        tool_type:
+          type: string
+          example: Plasma Etcher
+        area:
+          type: string
+          example: Etch
+        status:
+          type: string
+          example: Active
+    Alarm:
+      type: object
+      required:
+        - alarm_code
+        - description
+        - severity
+      properties:
+        alarm_code:
+          type: string
+          example: RF101
+        description:
+          type: string
+          example: RF Power Instability
+        severity:
+          type: string
+          enum:
+            - Low
+            - Medium
+            - High
+    Incident:
+      type: object
+      required:
+        - incident_id
+        - date
+        - equipment
+        - alarm_code
+        - root_cause
+        - corrective_action
+      properties:
+        incident_id:
+          type: string
+          example: H001
+        date:
+          type: string
+          format: date
+          example: 2026-06-01
+        equipment:
+          type: string
+          example: Etcher-03
+        alarm_code:
+          type: string
+          example: RF101
+        root_cause:
+          type: string
+          example: Loose RF cable
+        corrective_action:
+          type: string
+          example: Tightened RF connector and verified reflected power
+    IncidentList:
+      type: object
+      required:
+        - incidents
+      properties:
+        incidents:
+          type: array
+          items:
+            $ref: "#/components/schemas/Incident"
+    LookupRequest:
+      type: object
+      properties:
+        equipment:
+          type:
+            - string
+            - "null"
+          example: Etcher-03
+        alarm_code:
+          type:
+            - string
+            - "null"
+          example: RF101
+        include_incidents:
+          type: boolean
+          default: true
+        incident_limit:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 5
+    LookupResponse:
+      type: object
+      required:
+        - incidents
+        - missing
+      properties:
+        equipment:
+          anyOf:
+            - $ref: "#/components/schemas/Equipment"
+            - type: "null"
+        alarm:
+          anyOf:
+            - $ref: "#/components/schemas/Alarm"
+            - type: "null"
+        incidents:
+          type: array
+          items:
+            $ref: "#/components/schemas/Incident"
+        missing:
+          type: array
+          items:
+            type: string
+            enum:
+              - equipment
+              - alarm
+              - incidents
+          example: []
+    HealthResponse:
+      type: object
+      required:
+        - service
+        - status
+      properties:
+        service:
+          type: string
+          example: mock-data
+        status:
+          type: string
+          enum:
+            - ok
+            - degraded
+            - error
+        dependencies:
+          type: object
+          additionalProperties: true
+          example:
+            equipment_records: 5
+            alarm_records: 8
+            incident_records: 6
+    ErrorResponse:
+      type: object
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          type: string
+          example: unknown_equipment
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true

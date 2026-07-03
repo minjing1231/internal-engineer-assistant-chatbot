@@ -1,0 +1,324 @@
+openapi: 3.1.0
+info:
+  title: LLM Reasoning Service
+  version: 0.1.0
+  description: Prompt construction and LLM generation API for grounded troubleshooting responses.
+servers:
+  - url: http://localhost:8002
+    description: Local host
+  - url: http://llm-reasoning:8002
+    description: Docker network
+tags:
+  - name: reasoning
+    description: LLM response generation
+  - name: health
+    description: Service health checks
+paths:
+  /generate:
+    post:
+      tags:
+        - reasoning
+      summary: Generate grounded troubleshooting answer
+      description: Uses supplied SOP chunks and structured context to generate a response with a real LLM provider.
+      operationId: generateTroubleshootingAnswer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateRequest"
+      responses:
+        "200":
+          description: LLM answer generated and parsed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateResponse"
+        "400":
+          description: Missing question or SOP context.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: LLM provider unavailable or timed out.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /health:
+    get:
+      tags:
+        - health
+      summary: Get service health
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service health.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+components:
+  schemas:
+    GenerateRequest:
+      type: object
+      required:
+        - question
+        - sop_context
+      properties:
+        question:
+          type: string
+          minLength: 1
+          example: CVD-05 triggered GAS012 during deposition. Should I escalate?
+        sop_context:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/SopContextChunk"
+        structured_context:
+          $ref: "#/components/schemas/StructuredContext"
+    GenerateResponse:
+      type: object
+      required:
+        - answer
+        - model
+        - warnings
+      properties:
+        answer:
+          $ref: "#/components/schemas/TroubleshootingAnswer"
+        model:
+          type: string
+          example: LiquidAI/LFM2.5-1.2B-Instruct
+        usage:
+          $ref: "#/components/schemas/Usage"
+        warnings:
+          type: array
+          items:
+            type: string
+    StructuredContext:
+      type: object
+      properties:
+        equipment:
+          anyOf:
+            - $ref: "#/components/schemas/Equipment"
+            - type: "null"
+        alarm:
+          anyOf:
+            - $ref: "#/components/schemas/Alarm"
+            - type: "null"
+        incidents:
+          type: array
+          items:
+            $ref: "#/components/schemas/Incident"
+          default: []
+    SopContextChunk:
+      type: object
+      required:
+        - chunk_id
+        - source_id
+        - title
+        - section
+        - content
+      properties:
+        chunk_id:
+          type: string
+          example: SOP-CVD-003:escalation
+        source_id:
+          type: string
+          example: SOP-CVD-003
+        title:
+          type: string
+          example: CVD Gas Flow Deviation - Alarm GAS012
+        section:
+          type: string
+          example: Escalation Criteria
+        content:
+          type: string
+        score:
+          type:
+            - number
+            - "null"
+          format: float
+    Equipment:
+      type: object
+      required:
+        - equipment_id
+        - equipment_name
+        - tool_type
+        - area
+        - status
+      properties:
+        equipment_id:
+          type: string
+          example: EQ003
+        equipment_name:
+          type: string
+          example: CVD-05
+        tool_type:
+          type: string
+          example: PECVD Tool
+        area:
+          type: string
+          example: Deposition
+        status:
+          type: string
+          example: Active
+    Alarm:
+      type: object
+      required:
+        - alarm_code
+        - description
+        - severity
+      properties:
+        alarm_code:
+          type: string
+          example: GAS012
+        description:
+          type: string
+          example: Gas Flow Deviation
+        severity:
+          type: string
+          enum:
+            - Low
+            - Medium
+            - High
+    Incident:
+      type: object
+      required:
+        - incident_id
+        - date
+        - equipment
+        - alarm_code
+        - root_cause
+        - corrective_action
+      properties:
+        incident_id:
+          type: string
+          example: H004
+        date:
+          type: string
+          format: date
+          example: 2026-06-12
+        equipment:
+          type: string
+          example: CVD-05
+        alarm_code:
+          type: string
+          example: GAS012
+        root_cause:
+          type: string
+          example: MFC calibration drift
+        corrective_action:
+          type: string
+          example: Calibrated MFC and held affected lot
+    TroubleshootingAnswer:
+      type: object
+      required:
+        - issue_summary
+        - relevant_sop_context
+        - recommended_checks
+        - safety_precautions
+        - escalation_criteria
+        - uncertainty
+      properties:
+        issue_summary:
+          $ref: "#/components/schemas/IssueSummary"
+        relevant_sop_context:
+          type: array
+          items:
+            $ref: "#/components/schemas/SopReference"
+        recommended_checks:
+          type: array
+          items:
+            type: string
+        safety_precautions:
+          type: array
+          items:
+            type: string
+        escalation_criteria:
+          type: array
+          items:
+            type: string
+        uncertainty:
+          type: array
+          items:
+            type: string
+    IssueSummary:
+      type: object
+      properties:
+        equipment:
+          type:
+            - string
+            - "null"
+        alarm_or_symptom:
+          type:
+            - string
+            - "null"
+        severity:
+          type:
+            - string
+            - "null"
+          enum:
+            - Low
+            - Medium
+            - High
+            - null
+    SopReference:
+      type: object
+      required:
+        - source_id
+        - title
+      properties:
+        source_id:
+          type: string
+        title:
+          type: string
+        section:
+          type:
+            - string
+            - "null"
+    Usage:
+      type: object
+      properties:
+        input_tokens:
+          type: integer
+          minimum: 0
+        output_tokens:
+          type: integer
+          minimum: 0
+    HealthResponse:
+      type: object
+      required:
+        - service
+        - status
+      properties:
+        service:
+          type: string
+          example: llm-reasoning
+        status:
+          type: string
+          enum:
+            - ok
+            - degraded
+            - error
+        dependencies:
+          type: object
+          additionalProperties: true
+          example:
+            provider_configured: true
+            model: LiquidAI/LFM2.5-1.2B-Instruct
+    ErrorResponse:
+      type: object
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          type: string
+          example: llm_unavailable
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true

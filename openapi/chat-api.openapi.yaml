@@ -1,0 +1,232 @@
+openapi: 3.1.0
+info:
+  title: Chat API Service
+  version: 0.1.0
+  description: Public orchestration API for the manufacturing equipment repair assistant.
+servers:
+  - url: http://localhost:8000
+    description: Local host
+  - url: http://chat-api:8000
+    description: Docker network
+tags:
+  - name: chat
+    description: Troubleshooting chat orchestration
+  - name: health
+    description: Service health checks
+paths:
+  /chat:
+    post:
+      tags:
+        - chat
+      summary: Generate troubleshooting answer
+      description: Coordinates mock data lookup, SOP retrieval, and LLM reasoning to produce a grounded troubleshooting answer.
+      operationId: createChatAnswer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRequest"
+            example:
+              question: Etcher-03 triggered RF101 during plasma ignition. What should I check first?
+              top_k: 4
+              include_incidents: true
+      responses:
+        "200":
+          description: Answer generated or deterministic fallback returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+        "400":
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Required downstream service unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /health:
+    get:
+      tags:
+        - health
+      summary: Get service health
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service health.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+components:
+  schemas:
+    ChatRequest:
+      type: object
+      required:
+        - question
+      properties:
+        question:
+          type: string
+          minLength: 1
+          description: Free-text troubleshooting question.
+        top_k:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 4
+          description: Number of SOP chunks to request from RAG Retrieval Service.
+        include_incidents:
+          type: boolean
+          default: true
+          description: Whether to request matching incident history from Mock Data Service.
+    ChatResponse:
+      type: object
+      required:
+        - answer
+        - sources
+        - warnings
+      properties:
+        answer:
+          $ref: "#/components/schemas/TroubleshootingAnswer"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceReference"
+        warnings:
+          type: array
+          items:
+            type: string
+    TroubleshootingAnswer:
+      type: object
+      required:
+        - issue_summary
+        - relevant_sop_context
+        - recommended_checks
+        - safety_precautions
+        - escalation_criteria
+        - uncertainty
+      properties:
+        issue_summary:
+          $ref: "#/components/schemas/IssueSummary"
+        relevant_sop_context:
+          type: array
+          items:
+            $ref: "#/components/schemas/SopReference"
+        recommended_checks:
+          type: array
+          items:
+            type: string
+        safety_precautions:
+          type: array
+          items:
+            type: string
+        escalation_criteria:
+          type: array
+          items:
+            type: string
+        uncertainty:
+          type: array
+          items:
+            type: string
+    IssueSummary:
+      type: object
+      properties:
+        equipment:
+          type:
+            - string
+            - "null"
+          example: Etcher-03
+        alarm_or_symptom:
+          type:
+            - string
+            - "null"
+          example: RF101
+        severity:
+          type:
+            - string
+            - "null"
+          enum:
+            - Low
+            - Medium
+            - High
+            - null
+    SopReference:
+      type: object
+      required:
+        - source_id
+        - title
+      properties:
+        source_id:
+          type: string
+          example: SOP-ETCH-001
+        title:
+          type: string
+          example: Etcher RF Power Instability - Alarm RF101
+        section:
+          type:
+            - string
+            - "null"
+          example: Troubleshooting Steps
+    SourceReference:
+      type: object
+      required:
+        - type
+        - id
+      properties:
+        type:
+          type: string
+          enum:
+            - sop
+            - equipment
+            - alarm
+            - incident
+        id:
+          type: string
+          example: SOP-ETCH-001
+        section:
+          type:
+            - string
+            - "null"
+          example: Troubleshooting Steps
+    HealthResponse:
+      type: object
+      required:
+        - service
+        - status
+      properties:
+        service:
+          type: string
+          example: chat-api
+        status:
+          type: string
+          enum:
+            - ok
+            - degraded
+            - error
+        dependencies:
+          type: object
+          additionalProperties: true
+          example:
+            rag_retrieval: ok
+            llm_reasoning: ok
+            mock_data: ok
+    ErrorResponse:
+      type: object
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          type: string
+          example: rag_unavailable
+        message:
+          type: string
+          example: RAG Retrieval Service is unavailable.
+        details:
+          type: object
+          additionalProperties: true

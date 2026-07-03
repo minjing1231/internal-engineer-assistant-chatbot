@@ -1,0 +1,228 @@
+openapi: 3.1.0
+info:
+  title: RAG Retrieval Service
+  version: 0.1.0
+  description: SOP ingestion and retrieval API for the manufacturing equipment repair assistant.
+servers:
+  - url: http://localhost:8001
+    description: Local host
+  - url: http://rag-retrieval:8001
+    description: Docker network
+tags:
+  - name: retrieval
+    description: SOP search endpoints
+  - name: index
+    description: SOP index management
+  - name: health
+    description: Service health checks
+paths:
+  /search:
+    post:
+      tags:
+        - retrieval
+      summary: Search SOP context
+      description: Returns the most relevant SOP chunks for a troubleshooting question.
+      operationId: searchSopContext
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchRequest"
+            example:
+              query: Etcher-03 has RF101 alarm during plasma ignition
+              equipment: Etcher-03
+              alarm_code: RF101
+              top_k: 4
+      responses:
+        "200":
+          description: Search completed. Results may be empty.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+        "400":
+          description: Invalid search request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: SOP index unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /reindex:
+    post:
+      tags:
+        - index
+      summary: Rebuild SOP index
+      description: Reloads document/SOP.md and rebuilds the in-memory retrieval index.
+      operationId: reindexSop
+      responses:
+        "200":
+          description: Index rebuilt.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReindexResponse"
+        "500":
+          description: Reindex failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /health:
+    get:
+      tags:
+        - health
+      summary: Get service health
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service health.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+components:
+  schemas:
+    SearchRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          minLength: 1
+          description: Original user question or search text.
+        equipment:
+          type:
+            - string
+            - "null"
+          description: Extracted equipment name.
+          example: Etcher-03
+        alarm_code:
+          type:
+            - string
+            - "null"
+          description: Extracted alarm code.
+          example: RF101
+        top_k:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 4
+          description: Maximum number of chunks to return.
+    SearchResponse:
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SopContextChunk"
+    SopContextChunk:
+      type: object
+      required:
+        - chunk_id
+        - source_id
+        - title
+        - section
+        - content
+        - score
+      properties:
+        chunk_id:
+          type: string
+          example: SOP-ETCH-001:troubleshooting
+        source_id:
+          type: string
+          example: SOP-ETCH-001
+        title:
+          type: string
+          example: Etcher RF Power Instability - Alarm RF101
+        section:
+          type: string
+          example: Troubleshooting Steps
+        equipment:
+          type: array
+          items:
+            type: string
+          example:
+            - Plasma Etcher
+            - Etcher-03
+        alarm_code:
+          type:
+            - string
+            - "null"
+          example: RF101
+        severity:
+          type:
+            - string
+            - "null"
+          enum:
+            - Low
+            - Medium
+            - High
+            - null
+        content:
+          type: string
+        score:
+          type: number
+          format: float
+          minimum: 0
+    ReindexResponse:
+      type: object
+      required:
+        - status
+        - sop_path
+        - chunks_indexed
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+        sop_path:
+          type: string
+          example: /app/document/SOP.md
+        chunks_indexed:
+          type: integer
+          minimum: 0
+          example: 40
+    HealthResponse:
+      type: object
+      required:
+        - service
+        - status
+      properties:
+        service:
+          type: string
+          example: rag-retrieval
+        status:
+          type: string
+          enum:
+            - ok
+            - degraded
+            - error
+        dependencies:
+          type: object
+          additionalProperties: true
+          example:
+            sop_loaded: true
+            chunks_indexed: 40
+    ErrorResponse:
+      type: object
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          type: string
+          example: sop_index_unavailable
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true

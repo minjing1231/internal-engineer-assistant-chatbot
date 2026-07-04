@@ -1,6 +1,7 @@
 import re
 
 from ..schemas import (
+    ActionDecision,
     ChatRequest,
     ChatResponse,
     IssueSummary,
@@ -11,7 +12,7 @@ from ..schemas import (
 )
 
 
-ALARM_RE = re.compile(r"\b[A-Z]{2,}\d{2,}\b")
+ALARM_RE = re.compile(r"\b[A-Z]{2,}\d+\b")
 EQUIPMENT_RE = re.compile(r"\b[A-Z][A-Za-z]+-\d{2}\b")
 
 
@@ -56,6 +57,28 @@ class TroubleshootingFlow:
                 alarm_hint,
                 warnings,
             )
+        if self._has_unconfirmed_alarm_mismatch(alarm_hint, structured_context, sop_context):
+            warnings.append(
+                f"Requested alarm {alarm_hint} was not confirmed in structured data; retrieved SOP context uses a different alarm."
+            )
+            return self._alarm_mismatch_response(
+                equipment_hint,
+                alarm_hint,
+                structured_context,
+                sop_context,
+                warnings,
+            )
+        if self._has_unconfirmed_equipment_mismatch(equipment_hint, structured_context, sop_context):
+            warnings.append(
+                f"Requested equipment {equipment_hint} was not confirmed in structured data; retrieved SOP context uses different equipment."
+            )
+            return self._equipment_mismatch_response(
+                equipment_hint,
+                alarm_hint,
+                structured_context,
+                sop_context,
+                warnings,
+            )
 
         try:
             llm_response = await self.llm_client.generate(
@@ -74,6 +97,42 @@ class TroubleshootingFlow:
             sources=self._build_sources(sop_context, structured_context),
             warnings=warnings,
         )
+
+    def _has_unconfirmed_alarm_mismatch(
+        self,
+        alarm_hint: str | None,
+        structured_context: dict,
+        sop_context: list[dict],
+    ) -> bool:
+        if not alarm_hint:
+            return False
+        structured_alarm = structured_context.get("alarm") or {}
+        if structured_alarm.get("alarm_code") == alarm_hint:
+            return False
+        sop_alarm_codes = {
+            item.get("alarm_code")
+            for item in sop_context
+            if item.get("alarm_code")
+        }
+        return bool(sop_alarm_codes and alarm_hint not in sop_alarm_codes)
+
+    def _has_unconfirmed_equipment_mismatch(
+        self,
+        equipment_hint: str | None,
+        structured_context: dict,
+        sop_context: list[dict],
+    ) -> bool:
+        if not equipment_hint:
+            return False
+        structured_equipment = structured_context.get("equipment") or {}
+        if structured_equipment.get("equipment_name") == equipment_hint:
+            return False
+        sop_equipment = {
+            equipment
+            for item in sop_context
+            for equipment in item.get("equipment", [])
+        }
+        return bool(sop_equipment and equipment_hint not in sop_equipment)
 
     async def _lookup_data(
         self,
@@ -105,6 +164,11 @@ class TroubleshootingFlow:
             uncertainty.append(f"Alarm hint from question: {alarm_code}")
         return ChatResponse(
             answer=TroubleshootingAnswer(
+                action_decision=ActionDecision(
+                    primary_action="Verify the equipment and alarm code, then search for matching SOP guidance.",
+                    escalate="Unknown",
+                    reason="No relevant SOP context was found, so the assistant cannot make a grounded escalation decision.",
+                ),
                 issue_summary=IssueSummary(
                     equipment=equipment,
                     alarm_or_symptom=alarm_code,
@@ -116,10 +180,119 @@ class TroubleshootingFlow:
             warnings=warnings,
         )
 
+    def _alarm_mismatch_response(
+        self,
+        equipment_hint: str | None,
+        alarm_hint: str | None,
+        structured_context: dict,
+        sop_context: list[dict],
+        warnings: list[str],
+    ) -> ChatResponse:
+        equipment = structured_context.get("equipment") or {}
+        retrieved_alarms = sorted(
+            {
+                item.get("alarm_code")
+                for item in sop_context
+                if item.get("alarm_code")
+            }
+        )
+        alarm_label = alarm_hint or "Unknown alarm"
+        return ChatResponse(
+            answer=TroubleshootingAnswer(
+                action_decision=ActionDecision(
+                    primary_action="Verify the exact alarm code on the tool HMI before applying a specific SOP.",
+                    escalate="Unknown",
+                    reason=(
+                        f"The requested alarm {alarm_label} is not confirmed in structured data and does not match "
+                        f"the retrieved SOP alarm code(s): {', '.join(retrieved_alarms) or 'none'}."
+                    ),
+                ),
+                issue_summary=IssueSummary(
+                    equipment=equipment.get("equipment_name") or equipment_hint,
+                    alarm_or_symptom=alarm_hint,
+                    severity=None,
+                ),
+                recovery_next_steps=[
+                    "Re-check the alarm code and equipment ID from the tool HMI.",
+                    "Search again with the confirmed alarm code.",
+                    "If there is any gas safety concern, stop recovery work and follow site escalation procedure.",
+                ],
+                uncertainty=[
+                    f"Alarm {alarm_label} was not found in the mock alarm reference data.",
+                    (
+                        "Retrieved SOP context was for a different alarm code "
+                        f"({', '.join(retrieved_alarms)}), so it was not used as confirmed evidence."
+                    ),
+                ],
+            ),
+            sources=[],
+            warnings=warnings,
+        )
+
+    def _equipment_mismatch_response(
+        self,
+        equipment_hint: str | None,
+        alarm_hint: str | None,
+        structured_context: dict,
+        sop_context: list[dict],
+        warnings: list[str],
+    ) -> ChatResponse:
+        alarm = structured_context.get("alarm") or {}
+        retrieved_equipment = sorted(
+            {
+                equipment
+                for item in sop_context
+                for equipment in item.get("equipment", [])
+            }
+        )
+        equipment_label = equipment_hint or "Unknown equipment"
+        return ChatResponse(
+            answer=TroubleshootingAnswer(
+                action_decision=ActionDecision(
+                    primary_action="Verify the equipment ID on the tool HMI before applying a specific SOP.",
+                    escalate="Unknown",
+                    reason=(
+                        f"The requested equipment {equipment_label} is not confirmed in structured data and does not match "
+                        f"the retrieved SOP equipment: {', '.join(retrieved_equipment) or 'none'}."
+                    ),
+                ),
+                issue_summary=IssueSummary(
+                    equipment=equipment_hint,
+                    alarm_or_symptom=alarm_hint,
+                    severity=alarm.get("severity"),
+                ),
+                recovery_next_steps=[
+                    "Re-check the equipment ID and alarm code from the tool HMI.",
+                    "Search again with the confirmed equipment ID.",
+                    "If the alarm is safety-critical or the tool cannot be confirmed, escalate to the equipment owner.",
+                ],
+                uncertainty=[
+                    f"Equipment {equipment_label} was not found in the mock equipment master data.",
+                    (
+                        "Retrieved SOP context was for different equipment "
+                        f"({', '.join(retrieved_equipment)}), so it was not used as confirmed evidence."
+                    ),
+                ],
+            ),
+            sources=[],
+            warnings=warnings,
+        )
+
     def _fallback_answer(self, sop_context: list[dict], structured_context: dict) -> TroubleshootingAnswer:
         equipment = structured_context.get("equipment") or {}
         alarm = structured_context.get("alarm") or {}
+        recommended_checks = self._extract_lines(sop_context, "Troubleshooting Steps")
+        escalation_criteria = self._extract_lines(sop_context, "Escalation Criteria")
         return TroubleshootingAnswer(
+            action_decision=ActionDecision(
+                primary_action=(
+                    recommended_checks[0]
+                    if recommended_checks
+                    else "Review retrieved SOP context before taking recovery action."
+                ),
+                escalate="Conditional" if escalation_criteria else "Unknown",
+                reason="LLM fallback used; escalation depends on the retrieved SOP criteria.",
+            ),
             issue_summary=IssueSummary(
                 equipment=equipment.get("equipment_name"),
                 alarm_or_symptom=alarm.get("alarm_code"),
@@ -133,9 +306,11 @@ class TroubleshootingFlow:
                 )
                 for item in sop_context
             ],
-            recommended_checks=self._extract_lines(sop_context, "Troubleshooting Steps"),
+            recommended_checks=recommended_checks,
+            likely_causes=self._incident_causes(structured_context),
+            recovery_next_steps=self._recovery_steps(recommended_checks, escalation_criteria),
             safety_precautions=self._extract_lines(sop_context, "Safety Precautions"),
-            escalation_criteria=self._extract_lines(sop_context, "Escalation Criteria"),
+            escalation_criteria=escalation_criteria,
             uncertainty=["LLM response was unavailable, so this answer was generated from retrieved SOP context only."],
         )
 
@@ -149,6 +324,20 @@ class TroubleshootingFlow:
                 if line and line not in lines:
                     lines.append(line)
         return lines
+
+    def _incident_causes(self, structured_context: dict) -> list[str]:
+        causes: list[str] = []
+        for incident in structured_context.get("incidents", []):
+            cause = incident.get("root_cause")
+            if cause and cause not in causes:
+                causes.append(cause)
+        return causes
+
+    def _recovery_steps(self, recommended_checks: list[str], escalation_criteria: list[str]) -> list[str]:
+        steps = recommended_checks[:3]
+        if escalation_criteria:
+            steps.append("Escalate if any listed escalation criterion is met.")
+        return steps
 
     def _build_sources(self, sop_context: list[dict], structured_context: dict) -> list[SourceReference]:
         sources: list[SourceReference] = []

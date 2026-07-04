@@ -45,6 +45,11 @@ def install_file_logging(app: FastAPI, service_name: str) -> None:
         return Response(content=response_body, status_code=response.status_code, headers=headers, media_type=response.media_type)
 
 
+def log_event(service_name: str, payload: dict[str, Any]) -> None:
+    logger = _build_logger(service_name)
+    _write(logger, {"service": service_name, "timestamp": _now(), **payload})
+
+
 def _build_logger(service_name: str) -> logging.Logger:
     log_file = Path(os.getenv("LOG_FILE", f"logs/{service_name}.log"))
     log_file.parent.mkdir(parents=True, exist_ok=True)

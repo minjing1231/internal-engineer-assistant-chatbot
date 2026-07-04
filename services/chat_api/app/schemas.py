@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 
 Severity = Literal["Low", "Medium", "High"]
+EscalationDecision = Literal["Yes", "No", "Conditional", "Unknown"]
 
 
 class ChatRequest(BaseModel):
@@ -16,6 +17,12 @@ class IssueSummary(BaseModel):
     equipment: str | None = None
     alarm_or_symptom: str | None = None
     severity: Severity | None = None
+
+
+class ActionDecision(BaseModel):
+    primary_action: str | None = None
+    escalate: EscalationDecision = "Unknown"
+    reason: str | None = None
 
 
 class SopReference(BaseModel):
@@ -31,9 +38,12 @@ class SourceReference(BaseModel):
 
 
 class TroubleshootingAnswer(BaseModel):
+    action_decision: ActionDecision = Field(default_factory=ActionDecision)
     issue_summary: IssueSummary
     relevant_sop_context: list[SopReference] = Field(default_factory=list)
     recommended_checks: list[str] = Field(default_factory=list)
+    likely_causes: list[str] = Field(default_factory=list)
+    recovery_next_steps: list[str] = Field(default_factory=list)
     safety_precautions: list[str] = Field(default_factory=list)
     escalation_criteria: list[str] = Field(default_factory=list)
     uncertainty: list[str] = Field(default_factory=list)

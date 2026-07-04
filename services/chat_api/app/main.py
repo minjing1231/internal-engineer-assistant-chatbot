@@ -369,15 +369,24 @@ async def api_chat(request: ApiChatRequest) -> ApiChatResponse:
 def _answer_to_text(response: ChatResponse) -> str:
     answer = response.answer
     lines = []
+    decision = answer.action_decision
+    lines.append("Action Decision:")
+    lines.append(f"- Primary Action: {decision.primary_action or 'Unknown'}")
+    lines.append(f"- Escalate: {decision.escalate}")
+    lines.append(f"- Reason: {decision.reason or 'Not enough information to determine.'}")
+    lines.append("")
     summary = answer.issue_summary
     lines.append("Issue Summary:")
     lines.append(f"- Equipment: {summary.equipment or 'Unknown equipment'}")
     lines.append(f"- Alarm / Symptom: {summary.alarm_or_symptom or 'Unknown alarm or symptom'}")
     lines.append(f"- Severity: {summary.severity or 'Unknown severity'}")
+    _extend_sop_context(lines, answer.relevant_sop_context)
     _extend_section(lines, "Recommended Checks", answer.recommended_checks)
+    _extend_section(lines, "Likely Causes", answer.likely_causes)
+    _extend_section(lines, "Recovery / Next Steps", answer.recovery_next_steps)
     _extend_section(lines, "Safety Precautions", answer.safety_precautions)
     _extend_section(lines, "Escalation Criteria", answer.escalation_criteria)
-    _extend_section(lines, "Uncertainty", answer.uncertainty)
+    _extend_section(lines, "Uncertainty / Missing Information", answer.uncertainty)
     return "\n".join(lines)
 
 
@@ -386,7 +395,25 @@ def _extend_section(lines: list[str], title: str, items: list[str]) -> None:
         return
     lines.append("")
     lines.append(f"{title}:")
+    if title in {"Recommended Checks", "Likely Causes", "Recovery / Next Steps"}:
+        lines.extend(f"{index}. {item}" for index, item in enumerate(items, start=1))
+        return
     lines.extend(f"- {item}" for item in items)
+
+
+def _extend_sop_context(lines: list[str], refs: list) -> None:
+    if not refs:
+        return
+    sections = []
+    for ref in refs:
+        label = ref.section or ref.title or ref.source_id
+        if label and label not in sections:
+            sections.append(label)
+    if not sections:
+        return
+    lines.append("")
+    lines.append("Relevant SOP Context:")
+    lines.append(f"- SOP section(s) used: {', '.join(sections)}")
 
 
 def _source_title(source_id: str, response: ChatResponse) -> str:

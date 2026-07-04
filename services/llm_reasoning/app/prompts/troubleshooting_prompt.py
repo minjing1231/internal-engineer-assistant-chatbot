@@ -8,6 +8,11 @@ Prioritize safety precautions and escalation criteria.
 Return valid JSON only. Do not return markdown.
 The JSON schema must be:
 {
+  "action_decision": {
+    "primary_action": "string or null",
+    "escalate": "Yes, No, Conditional, or Unknown",
+    "reason": "string or null"
+  },
   "issue_summary": {
     "equipment": "string or null",
     "alarm_or_symptom": "string or null",
@@ -17,10 +22,13 @@ The JSON schema must be:
     {"source_id": "string", "title": "string", "section": "string or null"}
   ],
   "recommended_checks": ["string"],
+  "likely_causes": ["string"],
+  "recovery_next_steps": ["string"],
   "safety_precautions": ["string"],
   "escalation_criteria": ["string"],
   "uncertainty": ["string"]
 }
+Use action_decision to answer the user's intent first. For escalation questions, set escalate clearly.
 All list fields must be JSON arrays, even if there is only one item."""
 
 

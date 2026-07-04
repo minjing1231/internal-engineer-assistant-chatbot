@@ -7,7 +7,7 @@ from .config import (
     LLM_TEMPERATURE,
     LLM_TIMEOUT_SECONDS,
 )
-from .logging_utils import install_file_logging
+from .logging_utils import install_file_logging, log_event
 from .prompts.troubleshooting_prompt import build_messages
 from .providers.openai_compatible_provider import LlmProviderError, generate_chat_completion
 from .response_parser import fallback_answer, parse_answer
@@ -41,6 +41,17 @@ async def generate(request: GenerateRequest) -> GenerateResponse:
     warnings: list[str] = []
     usage = None
     try:
+        log_event(
+            "llm-reasoning",
+            {
+                "event": "llm_provider_request",
+                "base_url": LLM_BASE_URL,
+                "model": LLM_MODEL,
+                "temperature": LLM_TEMPERATURE,
+                "timeout_seconds": LLM_TIMEOUT_SECONDS,
+                "messages": messages,
+            },
+        )
         content, raw_usage = await generate_chat_completion(
             base_url=LLM_BASE_URL,
             api_key=LLM_API_KEY,
@@ -49,6 +60,15 @@ async def generate(request: GenerateRequest) -> GenerateResponse:
             temperature=LLM_TEMPERATURE,
             timeout_seconds=LLM_TIMEOUT_SECONDS,
         )
+        log_event(
+            "llm-reasoning",
+            {
+                "event": "llm_provider_response",
+                "model": LLM_MODEL,
+                "content": content,
+                "raw_usage": raw_usage,
+            },
+        )
         answer = parse_answer(content, request)
         if raw_usage:
             usage = Usage(
@@ -56,6 +76,14 @@ async def generate(request: GenerateRequest) -> GenerateResponse:
                 output_tokens=raw_usage.get("completion_tokens", 0),
             )
     except (LlmProviderError, ValueError) as exc:
+        log_event(
+            "llm-reasoning",
+            {
+                "event": "llm_provider_error",
+                "model": LLM_MODEL,
+                "error": str(exc),
+            },
+        )
         warnings.append(f"LLM fallback used: {exc}")
         answer = fallback_answer(request, uncertainty="LLM response unavailable or invalid.")
 

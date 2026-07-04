@@ -107,7 +107,7 @@ UI_HTML = """
     .workspace {
       height: calc(100vh - 58px);
       display: grid;
-      grid-template-columns: 220px minmax(320px, 0.95fr) minmax(520px, 1.35fr);
+      grid-template-columns: minmax(0, 1fr);
       gap: 14px;
       padding: 14px;
     }
@@ -375,6 +375,7 @@ UI_HTML = """
     </header>
 
     <main class="workspace">
+      <!--
       <aside class="panel">
         <div class="panel-head">
           <h2>SOP Regions</h2>
@@ -397,6 +398,7 @@ UI_HTML = """
           <div class="doc-sections" id="doc-sections"></div>
         </div>
       </section>
+      -->
 
       <section class="panel chat">
         <div class="panel-head chat-head">
@@ -671,6 +673,7 @@ UI_HTML = """
     }
 
     function render() {
+      if (!regionList) return;
       renderNav();
       renderDetail();
     }
@@ -692,6 +695,7 @@ UI_HTML = """
 
     function renderDetail() {
       const region = regions.find((item) => item.id === activeRegion) || filteredRegions()[0];
+      if (!document.getElementById("region-title")) return;
       document.getElementById("region-title").textContent = region.title;
       document.getElementById("region-description").textContent = region.description;
       document.getElementById("equipment").textContent = region.equipment;
@@ -728,6 +732,7 @@ UI_HTML = """
 
     function appendAssistant(data) {
       const node = appendMessage("assistant", data.answer || "No answer returned.");
+      /*
       const refs = data.state_references || [];
       if (refs.length) {
         const refList = document.createElement("div");
@@ -742,6 +747,7 @@ UI_HTML = """
         });
         node.appendChild(refList);
       }
+      */
       if (data.warnings && data.warnings.length) {
         const warning = document.createElement("div");
         warning.className = "muted";

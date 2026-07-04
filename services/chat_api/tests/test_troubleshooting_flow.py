@@ -5,6 +5,7 @@ from services.chat_api.app.orchestration.troubleshooting_flow import (
     extract_alarm_code,
     extract_equipment,
 )
+from services.chat_api.app.main import _answer_to_text
 from services.chat_api.app.schemas import ChatRequest
 
 
@@ -177,6 +178,7 @@ def test_unconfirmed_alarm_mismatch_does_not_use_nearby_sop_as_confirmed_answer(
     assert response.answer.issue_summary.severity is None
     assert response.sources == []
     assert "GAS012" in response.answer.action_decision.reason
+    assert _answer_to_text(response) == "Cannot find alarm type GAS0. Do you mean GAS012?"
 
 
 def test_unconfirmed_equipment_mismatch_does_not_apply_sop_to_unknown_tool():
@@ -196,3 +198,4 @@ def test_unconfirmed_equipment_mismatch_does_not_apply_sop_to_unknown_tool():
     assert response.sources == []
     assert "Etcher-07" in response.answer.action_decision.reason
     assert "Etcher-03" in response.answer.action_decision.reason
+    assert _answer_to_text(response) == "Cannot find equipment ID Etcher-07. Do you mean Etcher-03?"

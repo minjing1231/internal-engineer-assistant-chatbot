@@ -197,8 +197,15 @@ class TroubleshootingFlow:
             }
         )
         alarm_label = alarm_hint or "Unknown alarm"
+        suggested_alarm = retrieved_alarms[0] if retrieved_alarms else None
+        direct_response = (
+            f"Cannot find alarm type {alarm_label}. Do you mean {suggested_alarm}?"
+            if suggested_alarm
+            else f"Cannot find alarm type {alarm_label}."
+        )
         return ChatResponse(
             answer=TroubleshootingAnswer(
+                direct_response=direct_response,
                 action_decision=ActionDecision(
                     primary_action="Verify the exact alarm code on the tool HMI before applying a specific SOP.",
                     escalate="Unknown",
@@ -246,8 +253,15 @@ class TroubleshootingFlow:
             }
         )
         equipment_label = equipment_hint or "Unknown equipment"
+        suggested_equipment = self._suggest_equipment_id(retrieved_equipment)
+        direct_response = (
+            f"Cannot find equipment ID {equipment_label}. Do you mean {suggested_equipment}?"
+            if suggested_equipment
+            else f"Cannot find equipment ID {equipment_label}."
+        )
         return ChatResponse(
             answer=TroubleshootingAnswer(
+                direct_response=direct_response,
                 action_decision=ActionDecision(
                     primary_action="Verify the equipment ID on the tool HMI before applying a specific SOP.",
                     escalate="Unknown",
@@ -277,6 +291,12 @@ class TroubleshootingFlow:
             sources=[],
             warnings=warnings,
         )
+
+    def _suggest_equipment_id(self, equipment_values: list[str]) -> str | None:
+        for value in equipment_values:
+            if EQUIPMENT_RE.fullmatch(value):
+                return value
+        return equipment_values[0] if equipment_values else None
 
     def _fallback_answer(self, sop_context: list[dict], structured_context: dict) -> TroubleshootingAnswer:
         equipment = structured_context.get("equipment") or {}

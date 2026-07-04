@@ -368,6 +368,8 @@ async def api_chat(request: ApiChatRequest) -> ApiChatResponse:
 
 def _answer_to_text(response: ChatResponse) -> str:
     answer = response.answer
+    if answer.direct_response:
+        return answer.direct_response
     lines = []
     decision = answer.action_decision
     lines.append("Action Decision:")

@@ -38,6 +38,7 @@ class SourceReference(BaseModel):
 
 
 class TroubleshootingAnswer(BaseModel):
+    direct_response: str | None = None
     action_decision: ActionDecision = Field(default_factory=ActionDecision)
     issue_summary: IssueSummary
     relevant_sop_context: list[SopReference] = Field(default_factory=list)

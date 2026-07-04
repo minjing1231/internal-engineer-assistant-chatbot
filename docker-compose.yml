@@ -1,0 +1,43 @@
+services:
+  chat-api:
+    build:
+      context: .
+      dockerfile: services/chat_api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      RAG_SERVICE_URL: http://rag-retrieval:8001
+      LLM_SERVICE_URL: http://llm-reasoning:8002
+      DATA_SERVICE_URL: http://mock-data:8003
+    depends_on:
+      - rag-retrieval
+      - llm-reasoning
+      - mock-data
+
+  rag-retrieval:
+    build:
+      context: .
+      dockerfile: services/rag_retrieval/Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      SOP_FILE_PATH: /app/document/SOP.md
+      RETRIEVAL_TOP_K: "4"
+
+  llm-reasoning:
+    build:
+      context: .
+      dockerfile: services/llm_reasoning/Dockerfile
+    ports:
+      - "8002:8002"
+    env_file:
+      - .env
+
+  mock-data:
+    build:
+      context: .
+      dockerfile: services/mock_data/Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      DATA_DIR: /app/data

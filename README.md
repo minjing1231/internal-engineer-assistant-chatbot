@@ -31,6 +31,43 @@ LiquidAI/LFM2.5-1.2B-Instruct
 | `openapi/*.openapi.yaml` | Real OpenAPI/Swagger specs for each service. |
 | `.env.example` | Example environment configuration. |
 
+## Run Locally
+
+Create an environment file:
+
+```bash
+cp .env.example .env
+```
+
+Set `LLM_API_KEY` and `LLM_BASE_URL` in `.env`, then start the services:
+
+```bash
+docker compose up --build
+```
+
+Service docs:
+
+| Service | Swagger URL |
+| --- | --- |
+| Chat API | `http://localhost:8000/docs` |
+| RAG Retrieval | `http://localhost:8001/docs` |
+| LLM Reasoning | `http://localhost:8002/docs` |
+| Mock Data | `http://localhost:8003/docs` |
+
+Example chat request:
+
+```bash
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Etcher-03 triggered RF101 during plasma ignition. What should I check first?"}'
+```
+
+## Run Tests
+
+```bash
+pytest
+```
+
 ## Model Configuration
 
 Copy `.env.example` to `.env` and configure your inference endpoint:
@@ -43,4 +80,4 @@ LLM_MODEL=LiquidAI/LFM2.5-1.2B-Instruct
 
 ## Current Status
 
-The repository currently contains the assignment documents, SOP source, mock data, technical design, roadmap, and OpenAPI service contracts. Service implementation will follow the design in `document/TECHNICAL_DESIGN.md`.
+The repository contains the assignment documents, SOP source, mock data, technical design, roadmap, OpenAPI service contracts, FastAPI service implementation, Dockerfiles, Docker Compose configuration, and unit tests.

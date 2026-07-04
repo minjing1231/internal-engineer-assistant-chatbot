@@ -21,12 +21,13 @@ app = FastAPI(
 
 @app.get("/health", response_model=HealthResponse, tags=["health"])
 async def health() -> HealthResponse:
-    configured = bool(LLM_BASE_URL and LLM_API_KEY)
+    configured = bool(LLM_BASE_URL)
     return HealthResponse(
         service="llm-reasoning",
         status="ok" if configured else "degraded",
         dependencies={
             "provider_configured": configured,
+            "provider_type": "local_mlx",
             "model": LLM_MODEL,
         },
     )

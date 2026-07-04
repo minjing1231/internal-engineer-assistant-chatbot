@@ -307,6 +307,7 @@ components:
           additionalProperties: true
           example:
             provider_configured: true
+            provider_type: local_mlx
             model: LiquidAI/LFM2.5-1.2B-Instruct
     ErrorResponse:
       type: object

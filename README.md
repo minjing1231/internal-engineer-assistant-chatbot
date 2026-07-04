@@ -39,7 +39,13 @@ Create an environment file:
 cp .env.example .env
 ```
 
-Set `LLM_API_KEY` and `LLM_BASE_URL` in `.env`, then start the services:
+Make sure your LiquidAI model is already running locally through MLX. If the MLX server is running on your Mac at port `8080`, keep this value in `.env` for Docker:
+
+```text
+LLM_BASE_URL=http://host.docker.internal:8080/v1
+```
+
+Then start the services:
 
 ```bash
 docker compose up --build
@@ -73,10 +79,12 @@ pytest
 Copy `.env.example` to `.env` and configure your inference endpoint:
 
 ```text
-LLM_API_KEY=
-LLM_BASE_URL=
+LLM_BASE_URL=http://host.docker.internal:8080/v1
 LLM_MODEL=LiquidAI/LFM2.5-1.2B-Instruct
+LLM_API_KEY=
 ```
+
+`LLM_API_KEY` is optional for local MLX. Leave it empty if your local model server does not require authentication.
 
 ## Current Status
 

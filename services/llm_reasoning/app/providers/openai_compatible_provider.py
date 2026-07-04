@@ -16,11 +16,9 @@ async def generate_chat_completion(
 ) -> tuple[str, dict[str, int] | None]:
     if not base_url:
         raise LlmProviderError("LLM_BASE_URL is not configured")
-    if not api_key:
-        raise LlmProviderError("LLM_API_KEY is not configured")
 
     url = f"{base_url}/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}"}
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     payload = {
         "model": model,
         "messages": messages,

@@ -380,12 +380,13 @@ Response schema: `HealthResponse`
   "status": "ok",
   "dependencies": {
     "provider_configured": true,
+    "provider_type": "local_mlx",
     "model": "LiquidAI/LFM2.5-1.2B-Instruct"
   }
 }
 ```
 
-Do not expose API keys in this response.
+The local MLX endpoint should be reported as configured, but secrets should not be exposed in this response.
 
 ## 6. Mock Data Service
 

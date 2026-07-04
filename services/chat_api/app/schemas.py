@@ -45,6 +45,28 @@ class ChatResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class ApiChatRequest(BaseModel):
+    message: str = Field(min_length=1)
+    configuration: str | None = None
+    region: str | None = None
+
+
+class StateReference(BaseModel):
+    source_id: str
+    title: str
+    section: str | None = None
+    region: str | None = None
+
+
+class ApiChatResponse(BaseModel):
+    answer: str
+    model_name: str
+    retrieval_count: int
+    generated: bool
+    state_references: list[StateReference] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class HealthResponse(BaseModel):
     service: str
     status: Literal["ok", "degraded", "error"]

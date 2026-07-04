@@ -7,7 +7,16 @@ from .clients.rag_client import RagClient
 from .config import DATA_SERVICE_URL, LLM_SERVICE_URL, RAG_SERVICE_URL, SERVICE_TIMEOUT_SECONDS
 from .logging_utils import install_file_logging
 from .orchestration.troubleshooting_flow import TroubleshootingFlow
-from .schemas import ChatRequest, ChatResponse, HealthResponse, ServiceError
+from .schemas import (
+    ApiChatRequest,
+    ApiChatResponse,
+    ChatRequest,
+    ChatResponse,
+    HealthResponse,
+    ServiceError,
+    StateReference,
+)
+from .ui import UI_HTML
 
 app = FastAPI(
     title="Chat API Service",
@@ -24,6 +33,7 @@ flow = TroubleshootingFlow(data_client, rag_client, llm_client)
 
 @app.get("/", response_class=HTMLResponse, tags=["ui"])
 async def index() -> str:
+    return UI_HTML
     return """
 <!doctype html>
 <html lang="en">
@@ -34,13 +44,14 @@ async def index() -> str:
   <style>
     :root {
       color-scheme: light;
-      --bg: #f7f8fa;
+      --bg: #f5f7f9;
       --panel: #ffffff;
       --ink: #17202a;
       --muted: #5e6b78;
       --line: #dbe1e8;
       --accent: #116466;
       --accent-dark: #0b4f51;
+      --soft: #eef4f4;
       --warn: #8a5b00;
     }
     * { box-sizing: border-box; }
@@ -50,17 +61,14 @@ async def index() -> str:
       background: var(--bg);
       color: var(--ink);
     }
-    main {
-      width: min(1120px, calc(100vw - 32px));
-      margin: 28px auto;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 340px;
-      gap: 18px;
+    .shell {
+      width: min(920px, calc(100vw - 32px));
+      margin: 34px auto;
     }
     header {
-      grid-column: 1 / -1;
       border-bottom: 1px solid var(--line);
-      padding-bottom: 14px;
+      padding-bottom: 16px;
+      margin-bottom: 18px;
     }
     h1 {
       margin: 0 0 6px;
@@ -68,7 +76,7 @@ async def index() -> str:
       line-height: 1.2;
     }
     p { color: var(--muted); margin: 0; line-height: 1.5; }
-    section, aside {
+    .panel {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -88,6 +96,7 @@ async def index() -> str:
       padding: 12px;
       font: inherit;
       line-height: 1.45;
+      background: #fff;
     }
     button {
       border: 0;
@@ -99,15 +108,25 @@ async def index() -> str:
       cursor: pointer;
     }
     button:hover { background: var(--accent-dark); }
-    button.secondary {
-      width: 100%;
-      text-align: left;
-      background: #eef4f4;
-      color: var(--ink);
-      margin-top: 8px;
-      font-weight: 550;
+    .samples {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
     }
-    button.secondary:hover { background: #dfecec; }
+    .sample-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .sample {
+      text-align: left;
+      background: var(--soft);
+      color: var(--ink);
+      font-weight: 550;
+      padding: 9px 10px;
+    }
+    .sample:hover { background: #dfecec; }
     .actions {
       display: flex;
       align-items: center;
@@ -120,8 +139,6 @@ async def index() -> str:
     }
     .result {
       margin-top: 18px;
-      border-top: 1px solid var(--line);
-      padding-top: 18px;
     }
     .grid {
       display: grid;
@@ -145,6 +162,13 @@ async def index() -> str:
       font-size: 17px;
       margin: 18px 0 8px;
     }
+    .empty {
+      color: var(--muted);
+      padding: 18px;
+      border: 1px dashed var(--line);
+      border-radius: 6px;
+      background: #fbfcfd;
+    }
     ul, ol {
       margin: 8px 0 0 22px;
       padding: 0;
@@ -166,19 +190,19 @@ async def index() -> str:
       overflow: auto;
     }
     @media (max-width: 820px) {
-      main { grid-template-columns: 1fr; }
+      .sample-grid { grid-template-columns: 1fr; }
       .grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <main>
+  <main class="shell">
     <header>
       <h1>Manufacturing Repair Assistant</h1>
       <p>Ask an equipment troubleshooting question. The answer is grounded in SOP context and mock equipment data.</p>
     </header>
 
-    <section>
+    <section class="panel">
       <form id="chat-form">
         <label for="question">Troubleshooting question</label>
         <textarea id="question" name="question">Etcher-03 triggered RF101 during plasma ignition. What should I check first?</textarea>
@@ -187,20 +211,23 @@ async def index() -> str:
           <span class="status" id="status">Ready</span>
         </div>
       </form>
-      <div class="result" id="result"></div>
+
+      <div class="samples">
+        <label>Sample Questions</label>
+        <div class="sample-grid">
+          <button type="button" class="sample" data-q="Etcher-03 triggered RF101 during plasma ignition. What should I check first?">RF101 first checks</button>
+          <button type="button" class="sample" data-q="CMP-02 has low pad pressure. What are the likely causes and recovery steps?">CMP low pressure</button>
+          <button type="button" class="sample" data-q="CVD-05 triggered GAS012 during deposition. Should I escalate?">GAS012 escalation</button>
+          <button type="button" class="sample" data-q="Litho-01 cannot align wafer properly. What SOP steps should I follow?">Litho alignment</button>
+          <button type="button" class="sample" data-q="Unknown equipment triggered alarm ABC999. What should I do?">Unknown alarm</button>
+          <button type="button" class="sample" data-q="Etcher-03 had RF101 three times this week. What should be escalated?">Repeated RF101</button>
+        </div>
+      </div>
     </section>
 
-    <aside>
-      <h2>Sample Questions</h2>
-      <button class="secondary" data-q="Etcher-03 triggered RF101 during plasma ignition. What should I check first?">RF101 first checks</button>
-      <button class="secondary" data-q="CMP-02 has low pad pressure. What are the likely causes and recovery steps?">CMP low pressure</button>
-      <button class="secondary" data-q="CVD-05 triggered GAS012 during deposition. Should I escalate?">GAS012 escalation</button>
-      <button class="secondary" data-q="Litho-01 cannot align wafer properly. What SOP steps should I follow?">Litho alignment</button>
-      <button class="secondary" data-q="Unknown equipment triggered alarm ABC999. What should I do?">Unknown alarm</button>
-      <button class="secondary" data-q="Etcher-03 had RF101 three times this week. What should be escalated?">Repeated RF101</button>
-      <h2>Service Docs</h2>
-      <p><a href="/docs">Chat API Swagger</a></p>
-    </aside>
+    <section class="panel result" id="result">
+      <div class="empty">Submit a question to generate a troubleshooting response.</div>
+    </section>
   </main>
 
   <script>
@@ -219,12 +246,12 @@ async def index() -> str:
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       statusEl.textContent = "Thinking...";
-      result.innerHTML = "";
+      result.innerHTML = `<div class="empty">Retrieving SOP context and preparing answer...</div>`;
       try {
         const response = await fetch("/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: question.value, top_k: 4, include_incidents: true }),
+          body: JSON.stringify({ question: question.value, top_k: 3, include_incidents: true }),
         });
         const data = await response.json();
         if (!response.ok) {
@@ -310,3 +337,61 @@ async def health() -> HealthResponse:
 @app.post("/chat", response_model=ChatResponse, tags=["chat"])
 async def chat(request: ChatRequest) -> ChatResponse:
     return await flow.answer(request)
+
+
+@app.post("/api/chat", response_model=ApiChatResponse, tags=["ui"])
+async def api_chat(request: ApiChatRequest) -> ApiChatResponse:
+    chat_request = ChatRequest(
+        question=request.message,
+        top_k=3,
+        include_incidents=True,
+    )
+    response = await flow.answer(chat_request)
+    return ApiChatResponse(
+        answer=_answer_to_text(response),
+        model_name="LiquidAI/LFM2.5-1.2B-Instruct",
+        retrieval_count=len([source for source in response.sources if source.type == "sop"]),
+        generated=not response.warnings,
+        state_references=[
+            StateReference(
+                source_id=source.id,
+                title=_source_title(source.id, response),
+                section=source.section,
+                region=source.id,
+            )
+            for source in response.sources
+            if source.type == "sop"
+        ],
+        warnings=response.warnings,
+    )
+
+
+def _answer_to_text(response: ChatResponse) -> str:
+    answer = response.answer
+    lines = []
+    summary = answer.issue_summary
+    lines.append(
+        f"Issue Summary: {summary.equipment or 'Unknown equipment'} / "
+        f"{summary.alarm_or_symptom or 'Unknown alarm'} / "
+        f"{summary.severity or 'Unknown severity'}"
+    )
+    _extend_section(lines, "Recommended Checks", answer.recommended_checks)
+    _extend_section(lines, "Safety Precautions", answer.safety_precautions)
+    _extend_section(lines, "Escalation Criteria", answer.escalation_criteria)
+    _extend_section(lines, "Uncertainty", answer.uncertainty)
+    return "\n".join(lines)
+
+
+def _extend_section(lines: list[str], title: str, items: list[str]) -> None:
+    if not items:
+        return
+    lines.append("")
+    lines.append(f"{title}:")
+    lines.extend(f"- {item}" for item in items)
+
+
+def _source_title(source_id: str, response: ChatResponse) -> str:
+    for item in response.answer.relevant_sop_context:
+        if item.source_id == source_id:
+            return item.title
+    return source_id

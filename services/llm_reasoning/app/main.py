@@ -49,7 +49,7 @@ async def generate(request: GenerateRequest) -> GenerateResponse:
             temperature=LLM_TEMPERATURE,
             timeout_seconds=LLM_TIMEOUT_SECONDS,
         )
-        answer = parse_answer(content)
+        answer = parse_answer(content, request)
         if raw_usage:
             usage = Usage(
                 input_tokens=raw_usage.get("prompt_tokens", 0),

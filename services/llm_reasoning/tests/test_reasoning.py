@@ -1,5 +1,5 @@
 from services.llm_reasoning.app.prompts.troubleshooting_prompt import build_messages
-from services.llm_reasoning.app.response_parser import fallback_answer
+from services.llm_reasoning.app.response_parser import fallback_answer, parse_answer
 from services.llm_reasoning.app.schemas import (
     Alarm,
     Equipment,
@@ -62,3 +62,30 @@ def test_fallback_answer_uses_retrieved_sop_context():
         "Do not touch RF cables while RF power is enabled."
     ]
     assert "Provider unavailable." in answer.uncertainty
+
+
+def test_parse_answer_normalizes_string_fields_from_model():
+    content = """
+{
+  "issue_summary": "Etcher-03 triggered RF101 during plasma ignition.",
+  "relevant_sop_context": "SOP-ETCH-001 - Plasma Etcher RF instability.",
+  "recommended_checks": "Verify RF generator output. Check recent RF power trend.",
+  "safety_precautions": "Ensure tool is in safe state; Do not touch RF cables while RF power is enabled.",
+  "escalation_criteria": "Downtime exceeds 30 minutes; RF101 repeats more than twice within 7 days.",
+  "uncertainty": "No definitive root cause can be confirmed from the provided context."
+}
+"""
+
+    answer = parse_answer(content, _request())
+
+    assert answer.issue_summary.equipment == "Etcher-03"
+    assert answer.issue_summary.alarm_or_symptom == "RF101"
+    assert answer.relevant_sop_context[0].source_id == "SOP-ETCH-001"
+    assert answer.recommended_checks == [
+        "Verify RF generator output.",
+        "Check recent RF power trend.",
+    ]
+    assert answer.safety_precautions == [
+        "Ensure tool is in safe state",
+        "Do not touch RF cables while RF power is enabled.",
+    ]

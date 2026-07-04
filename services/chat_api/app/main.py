@@ -5,6 +5,7 @@ from .clients.data_client import DataClient
 from .clients.llm_client import LlmClient
 from .clients.rag_client import RagClient
 from .config import DATA_SERVICE_URL, LLM_SERVICE_URL, RAG_SERVICE_URL, SERVICE_TIMEOUT_SECONDS
+from .logging_utils import install_file_logging
 from .orchestration.troubleshooting_flow import TroubleshootingFlow
 from .schemas import ChatRequest, ChatResponse, HealthResponse, ServiceError
 
@@ -13,6 +14,7 @@ app = FastAPI(
     version="0.1.0",
     description="Public orchestration API for the manufacturing repair assistant.",
 )
+install_file_logging(app, "chat-api")
 
 data_client = DataClient(DATA_SERVICE_URL, SERVICE_TIMEOUT_SECONDS)
 rag_client = RagClient(RAG_SERVICE_URL, SERVICE_TIMEOUT_SECONDS)

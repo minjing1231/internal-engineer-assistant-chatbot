@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query
 
 from .config import DATA_DIR
+from .logging_utils import install_file_logging
 from .repository import MockDataRepository
 from .schemas import (
     Alarm,
@@ -16,6 +17,7 @@ app = FastAPI(
     version="0.1.0",
     description="Structured mock equipment, alarm, and historical incident data API.",
 )
+install_file_logging(app, "mock-data")
 repository = MockDataRepository(DATA_DIR)
 
 

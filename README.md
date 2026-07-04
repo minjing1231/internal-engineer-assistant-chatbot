@@ -80,6 +80,19 @@ curl -X POST http://localhost:8000/chat \
 pytest
 ```
 
+## Service Logs
+
+Each service writes JSON-lines logs under `logs/` when running through Docker Compose:
+
+| Service | Log File |
+| --- | --- |
+| Chat API | `logs/chat-api.log` |
+| RAG Retrieval | `logs/rag-retrieval.log` |
+| LLM Reasoning | `logs/llm-reasoning.log` |
+| Mock Data | `logs/mock-data.log` |
+
+Each log file includes service startup time and API request/response payloads.
+
 ## Model Configuration
 
 Copy `.env.example` to `.env` and configure your inference endpoint:

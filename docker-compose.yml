@@ -9,6 +9,9 @@ services:
       RAG_SERVICE_URL: http://rag-retrieval:8001
       LLM_SERVICE_URL: http://llm-reasoning:8002
       DATA_SERVICE_URL: http://mock-data:8003
+      LOG_FILE: /app/logs/chat-api.log
+    volumes:
+      - ./logs:/app/logs
     depends_on:
       - rag-retrieval
       - llm-reasoning
@@ -23,6 +26,9 @@ services:
     environment:
       SOP_FILE_PATH: /app/document/SOP.md
       RETRIEVAL_TOP_K: "4"
+      LOG_FILE: /app/logs/rag-retrieval.log
+    volumes:
+      - ./logs:/app/logs
 
   llm-reasoning:
     build:
@@ -32,6 +38,10 @@ services:
       - "8002:8002"
     env_file:
       - .env
+    environment:
+      LOG_FILE: /app/logs/llm-reasoning.log
+    volumes:
+      - ./logs:/app/logs
 
   mock-data:
     build:
@@ -41,3 +51,6 @@ services:
       - "8003:8003"
     environment:
       DATA_DIR: /app/data
+      LOG_FILE: /app/logs/mock-data.log
+    volumes:
+      - ./logs:/app/logs

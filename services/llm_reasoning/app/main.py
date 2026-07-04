@@ -7,6 +7,7 @@ from .config import (
     LLM_TEMPERATURE,
     LLM_TIMEOUT_SECONDS,
 )
+from .logging_utils import install_file_logging
 from .prompts.troubleshooting_prompt import build_messages
 from .providers.openai_compatible_provider import LlmProviderError, generate_chat_completion
 from .response_parser import fallback_answer, parse_answer
@@ -17,6 +18,7 @@ app = FastAPI(
     version="0.1.0",
     description="Prompt construction and LLM generation API for grounded troubleshooting responses.",
 )
+install_file_logging(app, "llm-reasoning")
 
 
 @app.get("/health", response_model=HealthResponse, tags=["health"])

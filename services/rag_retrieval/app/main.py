@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 
 from .config import DEFAULT_TOP_K, SOP_FILE_PATH
 from .ingestion.markdown_loader import load_sop_chunks
+from .logging_utils import install_file_logging
 from .retrieval.keyword_search import KeywordRetriever
 from .schemas import HealthResponse, ReindexResponse, SearchRequest, SearchResponse
 
@@ -10,6 +11,7 @@ app = FastAPI(
     version="0.1.0",
     description="SOP ingestion and retrieval API for the manufacturing repair assistant.",
 )
+install_file_logging(app, "rag-retrieval")
 
 chunks = load_sop_chunks(SOP_FILE_PATH)
 retriever = KeywordRetriever(chunks)

@@ -196,6 +196,17 @@ UI_HTML = """
       margin: 0;
       color: #26333f;
     }
+    .doc-section ol {
+      margin: 0;
+      padding-left: 22px;
+      color: #26333f;
+    }
+    .doc-section li {
+      margin-bottom: 4px;
+    }
+    .doc-section li:last-child {
+      margin-bottom: 0;
+    }
     .doc-section.highlight {
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(17, 100, 102, 0.15);
@@ -689,9 +700,21 @@ UI_HTML = """
       document.getElementById("doc-sections").innerHTML = region.states.map((state, index) => `
         <section class="doc-section" data-section-index="${index}">
           <h3>${escapeHtml(state[0])}</h3>
-          <p>${escapeHtml(state[1])}</p>
+          ${renderSectionBody(state[0], state[1])}
         </section>
       `).join("");
+    }
+
+    function renderSectionBody(title, detail) {
+      if (title !== "Safety Precautions" && title !== "Troubleshooting Steps" && title !== "Escalation Criteria") {
+        return `<p>${escapeHtml(detail)}</p>`;
+      }
+      const items = detail
+        .replace(/\\.$/, "")
+        .split(/,\\s+(?:and\\s+)?/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+      return `<ol>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ol>`;
     }
 
     function appendMessage(role, text) {
@@ -731,9 +754,12 @@ UI_HTML = """
       const region = regions.find((item) => item.id === ref.source_id);
       if (!region) return;
       activeRegion = region.id;
-      const stateIndex = ref.section ? region.states.findIndex((state) => state[0] === ref.section) : 0;
+      const stateIndex = ref.section && ref.section !== "Summary"
+        ? region.states.findIndex((state) => state[0] === ref.section)
+        : -1;
       render();
-      const section = document.querySelector(`[data-section-index="${stateIndex >= 0 ? stateIndex : 0}"]`);
+      if (stateIndex < 0) return;
+      const section = document.querySelector(`[data-section-index="${stateIndex}"]`);
       if (!section) return;
       section.scrollIntoView({behavior: "smooth", block: "center"});
       section.classList.add("highlight");

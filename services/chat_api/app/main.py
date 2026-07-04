@@ -370,11 +370,10 @@ def _answer_to_text(response: ChatResponse) -> str:
     answer = response.answer
     lines = []
     summary = answer.issue_summary
-    lines.append(
-        f"Issue Summary: {summary.equipment or 'Unknown equipment'} / "
-        f"{summary.alarm_or_symptom or 'Unknown alarm'} / "
-        f"{summary.severity or 'Unknown severity'}"
-    )
+    lines.append("Issue Summary:")
+    lines.append(f"- Equipment: {summary.equipment or 'Unknown equipment'}")
+    lines.append(f"- Alarm / Symptom: {summary.alarm_or_symptom or 'Unknown alarm or symptom'}")
+    lines.append(f"- Severity: {summary.severity or 'Unknown severity'}")
     _extend_section(lines, "Recommended Checks", answer.recommended_checks)
     _extend_section(lines, "Safety Precautions", answer.safety_precautions)
     _extend_section(lines, "Escalation Criteria", answer.escalation_criteria)

@@ -38,11 +38,71 @@ UI_HTML = """
     }
     .brand strong { display: block; font-size: 16px; }
     .brand span { color: var(--muted); font-size: 13px; }
-    .sample-toggle, .sample, .nav-item, .clear, .send, .ref-card {
+    [hidden] { display: none !important; }
+    .sample-toggle, .sample, .nav-item, .clear, .send, .ref-card, .login-submit {
       border: 0;
       border-radius: 6px;
       font: inherit;
       cursor: pointer;
+    }
+    .login-screen {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        linear-gradient(135deg, rgba(17, 100, 102, 0.08), transparent 38%),
+        var(--bg);
+    }
+    .login-card {
+      width: min(420px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 16px 40px rgba(23, 32, 42, 0.08);
+    }
+    .login-card h1 {
+      font-size: 22px;
+      margin-bottom: 6px;
+    }
+    .login-card p {
+      margin: 0 0 18px;
+    }
+    .login-form {
+      display: grid;
+      gap: 12px;
+    }
+    .login-form label {
+      display: grid;
+      gap: 7px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .login-form input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px;
+      font: inherit;
+      background: #fff;
+    }
+    .login-submit {
+      margin-top: 4px;
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 12px;
+      font-weight: 700;
+    }
+    .login-submit:hover {
+      background: var(--accent-dark);
+    }
+    .login-error {
+      min-height: 18px;
+      color: var(--danger);
+      font-size: 13px;
+      font-weight: 650;
     }
     .workspace {
       height: calc(100vh - 58px);
@@ -276,66 +336,87 @@ UI_HTML = """
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <strong>Repair Knowledge Workspace</strong>
-      <span>SOP-guided manufacturing equipment assistant</span>
-    </div>
-  </header>
-
-  <main class="workspace">
-    <aside class="panel">
-      <div class="panel-head">
-        <h2>SOP Regions</h2>
-        <p class="muted">Select a document to inspect its full SOP guidance.</p>
-      </div>
-      <div class="nav-list" id="region-list"></div>
-    </aside>
-
-    <section class="panel document-panel">
-      <div class="panel-head">
-        <h2 id="region-title"></h2>
-        <p class="muted" id="region-description"></p>
-      </div>
-      <div class="detail">
-        <div class="meta-grid">
-          <div class="meta"><span>Equipment</span><strong id="equipment"></strong></div>
-          <div class="meta"><span>Alarm</span><strong id="alarm"></strong></div>
-          <div class="meta"><span>Severity</span><strong id="severity"></strong></div>
-        </div>
-        <div class="doc-sections" id="doc-sections"></div>
-      </div>
-    </section>
-
-    <section class="panel chat">
-      <div class="panel-head chat-head">
-        <div>
-          <h2>Repair Assistant</h2>
-          <p class="muted">Conversation history stays visible during the session.</p>
-        </div>
-        <button type="button" class="clear" id="clear-chat">Clear</button>
-      </div>
-      <div class="messages" id="messages"></div>
-      <div class="chat-bottom">
-        <button type="button" class="sample-toggle" id="sample-toggle" aria-expanded="false">
-          Sample questions <span id="sample-toggle-label">Show</span>
-        </button>
-        <div class="sample-wrap" id="sample-wrap" hidden>
-          <button type="button" class="sample" data-q="Etcher-03 triggered RF101 during plasma ignition. What should I check first?">RF101 first checks</button>
-          <button type="button" class="sample" data-q="CMP-02 has low pad pressure. What are the likely causes and recovery steps?">CMP low pressure</button>
-          <button type="button" class="sample" data-q="CVD-05 triggered GAS012 during deposition. Should I escalate?">GAS012 escalation</button>
-          <button type="button" class="sample" data-q="Etcher-03 had RF101 three times this week. What should be escalated?">Repeated RF101</button>
-        </div>
-        <form id="chat-form">
-          <textarea id="chat-input">Etcher-03 triggered RF101 during plasma ignition. What should I check first?</textarea>
-          <div class="send-row">
-            <span class="status" id="status">Ready</span>
-            <button type="submit" class="send">Send</button>
-          </div>
-        </form>
-      </div>
+  <main class="login-screen" id="login-screen">
+    <section class="login-card">
+      <h1>Repair Knowledge Workspace</h1>
+      <p class="muted">Sign in to access SOP guidance and the repair assistant.</p>
+      <form class="login-form" id="login-form">
+        <label>
+          Username
+          <input id="login-username" name="username" autocomplete="username" />
+        </label>
+        <label>
+          Password
+          <input id="login-password" name="password" type="password" autocomplete="current-password" />
+        </label>
+        <button type="submit" class="login-submit">Login</button>
+        <div class="login-error" id="login-error" aria-live="polite"></div>
+      </form>
     </section>
   </main>
+
+  <div id="workspace-shell" hidden>
+    <header class="topbar">
+      <div class="brand">
+        <strong>Repair Knowledge Workspace</strong>
+        <span>SOP-guided manufacturing equipment assistant</span>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="panel">
+        <div class="panel-head">
+          <h2>SOP Regions</h2>
+          <p class="muted">Select a document to inspect its full SOP guidance.</p>
+        </div>
+        <div class="nav-list" id="region-list"></div>
+      </aside>
+
+      <section class="panel document-panel">
+        <div class="panel-head">
+          <h2 id="region-title"></h2>
+          <p class="muted" id="region-description"></p>
+        </div>
+        <div class="detail">
+          <div class="meta-grid">
+            <div class="meta"><span>Equipment</span><strong id="equipment"></strong></div>
+            <div class="meta"><span>Alarm</span><strong id="alarm"></strong></div>
+            <div class="meta"><span>Severity</span><strong id="severity"></strong></div>
+          </div>
+          <div class="doc-sections" id="doc-sections"></div>
+        </div>
+      </section>
+
+      <section class="panel chat">
+        <div class="panel-head chat-head">
+          <div>
+            <h2>Repair Assistant</h2>
+            <p class="muted">Conversation history stays visible during the session.</p>
+          </div>
+          <button type="button" class="clear" id="clear-chat">Clear</button>
+        </div>
+        <div class="messages" id="messages"></div>
+        <div class="chat-bottom">
+          <button type="button" class="sample-toggle" id="sample-toggle" aria-expanded="false">
+            Sample questions <span id="sample-toggle-label">Show</span>
+          </button>
+          <div class="sample-wrap" id="sample-wrap" hidden>
+            <button type="button" class="sample" data-q="Etcher-03 triggered RF101 during plasma ignition. What should I check first?">RF101 first checks</button>
+            <button type="button" class="sample" data-q="CMP-02 has low pad pressure. What are the likely causes and recovery steps?">CMP low pressure</button>
+            <button type="button" class="sample" data-q="CVD-05 triggered GAS012 during deposition. Should I escalate?">GAS012 escalation</button>
+            <button type="button" class="sample" data-q="Etcher-03 had RF101 three times this week. What should be escalated?">Repeated RF101</button>
+          </div>
+          <form id="chat-form">
+            <textarea id="chat-input" placeholder="Ask a troubleshooting question..."></textarea>
+            <div class="send-row">
+              <span class="status" id="status">Ready</span>
+              <button type="submit" class="send">Send</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </main>
+  </div>
 
   <script>
     const regions = [
@@ -494,6 +575,38 @@ UI_HTML = """
     const sampleToggle = document.getElementById("sample-toggle");
     const sampleToggleLabel = document.getElementById("sample-toggle-label");
     const sampleWrap = document.getElementById("sample-wrap");
+    const loginScreen = document.getElementById("login-screen");
+    const workspaceShell = document.getElementById("workspace-shell");
+    const loginForm = document.getElementById("login-form");
+    const loginUsername = document.getElementById("login-username");
+    const loginPassword = document.getElementById("login-password");
+    const loginError = document.getElementById("login-error");
+
+    function showWorkspace() {
+      loginScreen.hidden = true;
+      workspaceShell.hidden = false;
+    }
+
+    if (sessionStorage.getItem("repair-assistant-authenticated") === "true") {
+      showWorkspace();
+    } else {
+      loginUsername.focus();
+    }
+
+    loginForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const username = loginUsername.value.trim();
+      const password = loginPassword.value;
+      if (username === "hana" && password === "123") {
+        sessionStorage.setItem("repair-assistant-authenticated", "true");
+        loginError.textContent = "";
+        showWorkspace();
+        return;
+      }
+      loginError.textContent = "Invalid username or password.";
+      loginPassword.value = "";
+      loginPassword.focus();
+    });
 
     sampleToggle.addEventListener("click", () => {
       const willShow = sampleWrap.hidden;

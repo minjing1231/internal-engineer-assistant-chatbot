@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 
 from .clients.data_client import DataClient
 from .clients.llm_client import LlmClient
@@ -17,6 +18,274 @@ data_client = DataClient(DATA_SERVICE_URL, SERVICE_TIMEOUT_SECONDS)
 rag_client = RagClient(RAG_SERVICE_URL, SERVICE_TIMEOUT_SECONDS)
 llm_client = LlmClient(LLM_SERVICE_URL, SERVICE_TIMEOUT_SECONDS)
 flow = TroubleshootingFlow(data_client, rag_client, llm_client)
+
+
+@app.get("/", response_class=HTMLResponse, tags=["ui"])
+async def index() -> str:
+    return """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Repair Engineer Assistant</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --ink: #17202a;
+      --muted: #5e6b78;
+      --line: #dbe1e8;
+      --accent: #116466;
+      --accent-dark: #0b4f51;
+      --warn: #8a5b00;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    main {
+      width: min(1120px, calc(100vw - 32px));
+      margin: 28px auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 18px;
+    }
+    header {
+      grid-column: 1 / -1;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 14px;
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+    p { color: var(--muted); margin: 0; line-height: 1.5; }
+    section, aside {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+    }
+    label {
+      display: block;
+      font-weight: 650;
+      margin-bottom: 8px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 132px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px;
+      font: inherit;
+      line-height: 1.45;
+    }
+    button {
+      border: 0;
+      border-radius: 6px;
+      background: var(--accent);
+      color: white;
+      font-weight: 650;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+    button:hover { background: var(--accent-dark); }
+    button.secondary {
+      width: 100%;
+      text-align: left;
+      background: #eef4f4;
+      color: var(--ink);
+      margin-top: 8px;
+      font-weight: 550;
+    }
+    button.secondary:hover { background: #dfecec; }
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .status {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .result {
+      margin-top: 18px;
+      border-top: 1px solid var(--line);
+      padding-top: 18px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 12px 0 16px;
+    }
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px;
+      background: #fbfcfd;
+    }
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    h2 {
+      font-size: 17px;
+      margin: 18px 0 8px;
+    }
+    ul, ol {
+      margin: 8px 0 0 22px;
+      padding: 0;
+      line-height: 1.55;
+    }
+    .sources, .warnings {
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .warnings {
+      color: var(--warn);
+    }
+    pre {
+      white-space: pre-wrap;
+      background: #f3f5f7;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px;
+      overflow: auto;
+    }
+    @media (max-width: 820px) {
+      main { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Manufacturing Repair Assistant</h1>
+      <p>Ask an equipment troubleshooting question. The answer is grounded in SOP context and mock equipment data.</p>
+    </header>
+
+    <section>
+      <form id="chat-form">
+        <label for="question">Troubleshooting question</label>
+        <textarea id="question" name="question">Etcher-03 triggered RF101 during plasma ignition. What should I check first?</textarea>
+        <div class="actions">
+          <button type="submit">Ask Assistant</button>
+          <span class="status" id="status">Ready</span>
+        </div>
+      </form>
+      <div class="result" id="result"></div>
+    </section>
+
+    <aside>
+      <h2>Sample Questions</h2>
+      <button class="secondary" data-q="Etcher-03 triggered RF101 during plasma ignition. What should I check first?">RF101 first checks</button>
+      <button class="secondary" data-q="CMP-02 has low pad pressure. What are the likely causes and recovery steps?">CMP low pressure</button>
+      <button class="secondary" data-q="CVD-05 triggered GAS012 during deposition. Should I escalate?">GAS012 escalation</button>
+      <button class="secondary" data-q="Litho-01 cannot align wafer properly. What SOP steps should I follow?">Litho alignment</button>
+      <button class="secondary" data-q="Unknown equipment triggered alarm ABC999. What should I do?">Unknown alarm</button>
+      <button class="secondary" data-q="Etcher-03 had RF101 three times this week. What should be escalated?">Repeated RF101</button>
+      <h2>Service Docs</h2>
+      <p><a href="/docs">Chat API Swagger</a></p>
+    </aside>
+  </main>
+
+  <script>
+    const form = document.getElementById("chat-form");
+    const question = document.getElementById("question");
+    const statusEl = document.getElementById("status");
+    const result = document.getElementById("result");
+
+    document.querySelectorAll("[data-q]").forEach((button) => {
+      button.addEventListener("click", () => {
+        question.value = button.dataset.q;
+        question.focus();
+      });
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      statusEl.textContent = "Thinking...";
+      result.innerHTML = "";
+      try {
+        const response = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: question.value, top_k: 4, include_incidents: true }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Request failed");
+        }
+        renderAnswer(data);
+        statusEl.textContent = "Done";
+      } catch (error) {
+        statusEl.textContent = "Error";
+        result.innerHTML = `<pre>${escapeHtml(error.message)}</pre>`;
+      }
+    });
+
+    function renderAnswer(data) {
+      const answer = data.answer || {};
+      const summary = answer.issue_summary || {};
+      result.innerHTML = `
+        <div class="grid">
+          ${metric("Equipment", summary.equipment)}
+          ${metric("Alarm / Symptom", summary.alarm_or_symptom)}
+          ${metric("Severity", summary.severity)}
+        </div>
+        ${section("Relevant SOP Context", (answer.relevant_sop_context || []).map((item) =>
+          `${item.source_id}: ${item.title}${item.section ? " (" + item.section + ")" : ""}`
+        ))}
+        ${section("Recommended Checks", answer.recommended_checks, true)}
+        ${section("Safety Precautions", answer.safety_precautions)}
+        ${section("Escalation Criteria", answer.escalation_criteria)}
+        ${section("Uncertainty / Missing Information", answer.uncertainty)}
+        ${section("Sources", (data.sources || []).map((item) =>
+          `${item.type}: ${item.id}${item.section ? " / " + item.section : ""}`
+        ), false, "sources")}
+        ${section("Warnings", data.warnings || [], false, "warnings")}
+      `;
+    }
+
+    function metric(label, value) {
+      return `<div class="metric"><span>${escapeHtml(label)}</span>${escapeHtml(value || "Unknown")}</div>`;
+    }
+
+    function section(title, items, ordered = false, className = "") {
+      if (!items || items.length === 0) return "";
+      const tag = ordered ? "ol" : "ul";
+      return `
+        <h2>${escapeHtml(title)}</h2>
+        <${tag} class="${className}">
+          ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+        </${tag}>
+      `;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+  </script>
+</body>
+</html>
+    """
 
 
 @app.get("/health", response_model=HealthResponse, tags=["health"])

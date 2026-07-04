@@ -60,6 +60,12 @@ Service docs:
 | LLM Reasoning | `http://localhost:8002/docs` |
 | Mock Data | `http://localhost:8003/docs` |
 
+Minimal demo UI:
+
+```text
+http://localhost:8000/
+```
+
 Example chat request:
 
 ```bash

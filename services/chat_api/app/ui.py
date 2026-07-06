@@ -638,6 +638,12 @@ UI_HTML = """
       });
     });
 
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.shiftKey) return;
+      event.preventDefault();
+      form.requestSubmit();
+    });
+
     document.getElementById("clear-chat").addEventListener("click", () => {
       messages.innerHTML = "";
       statusEl.textContent = "Ready";

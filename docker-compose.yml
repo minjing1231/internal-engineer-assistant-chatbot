@@ -9,6 +9,7 @@ services:
       RAG_SERVICE_URL: http://rag-retrieval:8001
       LLM_SERVICE_URL: http://llm-reasoning:8002
       DATA_SERVICE_URL: http://mock-data:8003
+      SERVICE_TIMEOUT_SECONDS: "45"
       LOG_FILE: /app/logs/chat-api.log
     volumes:
       - ./logs:/app/logs

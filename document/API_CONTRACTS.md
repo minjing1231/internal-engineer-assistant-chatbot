@@ -1,10 +1,8 @@
 # FastAPI Service API Contracts
 
-This document defines the API contracts between the chatbot microservices. Each service should be implemented with FastAPI and expose Swagger UI automatically through `/docs`, ReDoc through `/redoc`, and the raw OpenAPI document through `/openapi.json`.
+This document defines the current API contracts between the chatbot microservices. Each service is implemented with FastAPI and exposes Swagger UI through `/docs`, ReDoc through `/redoc`, and raw OpenAPI through `/openapi.json`.
 
 ## 1. Swagger URLs
-
-When running locally with Docker Compose:
 
 | Service | Base URL | Swagger UI | OpenAPI JSON |
 | --- | --- | --- | --- |
@@ -13,87 +11,147 @@ When running locally with Docker Compose:
 | LLM Reasoning Service | `http://localhost:8002` | `http://localhost:8002/docs` | `http://localhost:8002/openapi.json` |
 | Mock Data Service | `http://localhost:8003` | `http://localhost:8003/docs` | `http://localhost:8003/openapi.json` |
 
-Recommended FastAPI metadata:
-
-```python
-app = FastAPI(
-    title="Chat API Service",
-    version="0.1.0",
-    description="Public orchestration API for the manufacturing repair assistant.",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
-)
-```
-
 ## 2. Shared API Conventions
 
-- All services use JSON request and response bodies.
-- All timestamps and dates use ISO-8601 strings.
-- All service-to-service calls use short timeouts.
-- All endpoints expose Pydantic response models so Swagger documents the exact schema.
+- All service-to-service requests use JSON.
+- All endpoints use Pydantic request/response models.
 - Health endpoints are unauthenticated.
-- Local demo authentication is out of scope.
+- Demo UI login is implemented in frontend JavaScript only and is not a production auth API.
+- Docker Compose uses internal service URLs:
+  - `http://rag-retrieval:8001`
+  - `http://llm-reasoning:8002`
+  - `http://mock-data:8003`
+- Chat API waits up to `SERVICE_TIMEOUT_SECONDS=45` for service calls.
+- LLM Reasoning waits up to `LLM_TIMEOUT_SECONDS=30` for the local MLX model provider.
 
-### Standard Error Response
+## 3. Shared Schemas
 
-Use this response body for `400`, `404`, `422`, `500`, and `503` responses where possible.
-
-```json
-{
-  "error_code": "unknown_alarm",
-  "message": "Alarm code ABC999 was not found in the mock alarm reference.",
-  "details": {
-    "alarm_code": "ABC999"
-  }
-}
-```
-
-Schema:
-
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `error_code` | string | yes | Stable machine-readable error code. |
-| `message` | string | yes | Human-readable explanation. |
-| `details` | object | no | Optional context about the failure. |
-
-### Standard Health Response
+### `HealthResponse`
 
 ```json
 {
-  "service": "rag-retrieval",
+  "service": "chat-api",
   "status": "ok",
-  "dependencies": {
-    "sop_loaded": true
-  }
+  "dependencies": {}
 }
 ```
 
-Schema:
+### `TroubleshootingAnswer`
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `service` | string | yes | Service name. |
-| `status` | string | yes | `ok`, `degraded`, or `error`. |
-| `dependencies` | object | no | Service-specific dependency details. |
+Used by Chat API and LLM Reasoning.
 
-## 3. Chat API Service
+```json
+{
+  "direct_response": null,
+  "action_decision": {
+    "primary_action": "Verify RF generator output reading from tool HMI.",
+    "escalate": "Conditional",
+    "reason": "Escalation depends on the listed SOP criteria."
+  },
+  "issue_summary": {
+    "equipment": "Etcher-03",
+    "alarm_or_symptom": "RF101",
+    "severity": "High"
+  },
+  "relevant_sop_context": [
+    {
+      "source_id": "SOP-ETCH-001",
+      "title": "Etcher RF Power Instability - Alarm RF101",
+      "section": "Troubleshooting Steps"
+    }
+  ],
+  "recommended_checks": [
+    "Verify RF generator output reading from tool HMI."
+  ],
+  "likely_causes": [
+    "RF generator drift"
+  ],
+  "recovery_next_steps": [
+    "Restart RF subsystem only if permitted by local operating procedure."
+  ],
+  "safety_precautions": [
+    "Confirm tool is in safe state before opening panels."
+  ],
+  "escalation_criteria": [
+    "RF101 repeats more than twice within 7 days."
+  ],
+  "uncertainty": []
+}
+```
+
+Field notes:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `direct_response` | string or null | Short FE response for correction cases, for example `Cannot find alarm type GAS0. Do you mean GAS012?`. If present, FE formatting uses this directly. |
+| `action_decision.escalate` | string | One of `Yes`, `No`, `Conditional`, or `Unknown`. |
+| `issue_summary.severity` | string or null | One of `Low`, `Medium`, `High`, or null. |
+| list fields | array | Always arrays, even when one item exists. |
+
+## 4. Chat API Service
 
 FastAPI title: `Chat API Service`
 
-Base URL:
+Base URLs:
 
 - Local host: `http://localhost:8000`
 - Docker network: `http://chat-api:8000`
 
-Tags:
+### `GET /`
 
-- `chat`
-- `health`
+Serves the browser frontend.
+
+Current UI behavior:
+
+- Demo login page.
+- Hardcoded demo credentials in frontend JavaScript: `hana` / `123`.
+- Assistant-only chat session after login.
+- Sample questions hidden behind a toggle.
+- `Enter` submits; `Shift + Enter` inserts a new line.
+
+### `POST /api/chat`
+
+Frontend endpoint used by the browser UI.
+
+Request schema: `ApiChatRequest`
+
+```json
+{
+  "message": "CVD-05 triggered GAS012 during deposition. Should I escalate?",
+  "configuration": "all",
+  "region": "SOP-CVD-003"
+}
+```
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `message` | string | yes | User question. |
+| `configuration` | string or null | no | Kept for UI compatibility; current assistant-only UI sends `all`. |
+| `region` | string or null | no | Kept for UI compatibility. |
+
+Response schema: `ApiChatResponse`
+
+```json
+{
+  "answer": "Action Decision:\n- Primary Action: Escalate and verify gas flow deviation conditions.\n- Escalate: Yes\n- Reason: GAS012 is a high-severity gas flow deviation alarm.",
+  "model_name": "LiquidAI/LFM2.5-1.2B-Instruct",
+  "retrieval_count": 3,
+  "generated": true,
+  "state_references": [],
+  "warnings": []
+}
+```
+
+Notes:
+
+- `answer` is already formatted for the frontend.
+- `state_references` may be returned by backend, but SOP jump-chip rendering is currently commented out in the UI.
+- For typo/mismatch cases, `answer` is a direct correction string such as `Cannot find equipment ID Etcher-0399. Do you mean Etcher-03?`.
+- `generated=false` means fallback or warning path was used.
 
 ### `POST /chat`
 
-Public endpoint used by the demo user or UI. This endpoint orchestrates calls to the Mock Data, RAG Retrieval, and LLM Reasoning services.
+Structured API endpoint used for testing or direct API integration.
 
 Request schema: `ChatRequest`
 
@@ -105,39 +163,28 @@ Request schema: `ChatRequest`
 }
 ```
 
-| Field | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- |
-| `question` | string | yes | none | Free-text troubleshooting question. |
-| `top_k` | integer | no | `4` | Number of SOP chunks to request from RAG service. |
-| `include_incidents` | boolean | no | `true` | Whether to request historical incidents from Mock Data Service. |
-
 Response schema: `ChatResponse`
 
 ```json
 {
   "answer": {
+    "direct_response": null,
+    "action_decision": {
+      "primary_action": "Verify RF generator output reading from tool HMI.",
+      "escalate": "Conditional",
+      "reason": "Escalation depends on whether RF101 persists, repeats, or hardware fault is suspected."
+    },
     "issue_summary": {
       "equipment": "Etcher-03",
       "alarm_or_symptom": "RF101",
       "severity": "High"
     },
-    "relevant_sop_context": [
-      {
-        "source_id": "SOP-ETCH-001",
-        "title": "Etcher RF Power Instability - Alarm RF101",
-        "section": "Troubleshooting Steps"
-      }
-    ],
-    "recommended_checks": [
-      "Verify RF generator output reading from tool HMI.",
-      "Check recent RF power trend for sudden drop or oscillation."
-    ],
-    "safety_precautions": [
-      "Confirm tool is in safe state before opening panels."
-    ],
-    "escalation_criteria": [
-      "Escalate if RF101 repeats more than twice within 7 days."
-    ],
+    "relevant_sop_context": [],
+    "recommended_checks": [],
+    "likely_causes": [],
+    "recovery_next_steps": [],
+    "safety_precautions": [],
+    "escalation_criteria": [],
     "uncertainty": []
   },
   "sources": [
@@ -151,48 +198,30 @@ Response schema: `ChatResponse`
 }
 ```
 
-Status codes:
+Important Chat API behavior:
 
-| Code | Meaning |
-| --- | --- |
-| `200` | Answer generated or deterministic fallback returned. |
-| `400` | Empty or invalid question. |
-| `503` | Required RAG service unavailable. |
+- Extracts equipment IDs like `Etcher-03` and `Etcher-0399`.
+- Extracts alarm codes like `RF101`, `GAS012`, and typo-like codes such as `GAS0`.
+- Calls Mock Data, RAG Retrieval, then LLM Reasoning if context is confirmed.
+- Blocks unconfirmed ID mismatches before LLM generation.
+- Uses deterministic fallback if LLM Reasoning is unavailable.
 
 ### `GET /health`
 
-Response schema: `HealthResponse`
+Returns dependency status for RAG Retrieval, LLM Reasoning, and Mock Data.
 
-```json
-{
-  "service": "chat-api",
-  "status": "ok",
-  "dependencies": {
-    "rag_retrieval": "ok",
-    "llm_reasoning": "ok",
-    "mock_data": "ok"
-  }
-}
-```
-
-## 4. RAG Retrieval Service
+## 5. RAG Retrieval Service
 
 FastAPI title: `RAG Retrieval Service`
 
-Base URL:
+Base URLs:
 
 - Local host: `http://localhost:8001`
 - Docker network: `http://rag-retrieval:8001`
 
-Tags:
-
-- `retrieval`
-- `index`
-- `health`
-
 ### `POST /search`
 
-Searches indexed SOP chunks and returns relevant context with citation metadata.
+Searches indexed SOP chunks using keyword overlap plus metadata boosts.
 
 Request schema: `SearchRequest`
 
@@ -205,89 +234,53 @@ Request schema: `SearchRequest`
 }
 ```
 
-| Field | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- |
-| `query` | string | yes | none | Original user question or search text. |
-| `equipment` | string | no | `null` | Extracted equipment name. |
-| `alarm_code` | string | no | `null` | Extracted alarm code. |
-| `top_k` | integer | no | `4` | Maximum chunks to return. |
-
 Response schema: `SearchResponse`
 
 ```json
 {
   "results": [
     {
-      "chunk_id": "SOP-ETCH-001:troubleshooting",
+      "chunk_id": "SOP-ETCH-001:troubleshooting-steps",
       "source_id": "SOP-ETCH-001",
       "title": "Etcher RF Power Instability - Alarm RF101",
       "section": "Troubleshooting Steps",
       "equipment": ["Plasma Etcher", "Etcher-03"],
       "alarm_code": "RF101",
       "severity": "High",
-      "content": "Verify RF generator output reading from tool HMI...",
-      "score": 0.92
+      "content": "1. Verify RF generator output reading from tool HMI.",
+      "score": 12.5
     }
   ]
 }
 ```
 
-Status codes:
+Retrieval scoring:
 
-| Code | Meaning |
-| --- | --- |
-| `200` | Search completed. Results may be empty. |
-| `400` | Invalid query or `top_k`. |
-| `503` | SOP index is unavailable. |
+- Keyword overlap over source ID, title, section, equipment, alarm code, severity, and content.
+- Exact alarm match boost: `+8.0`.
+- Exact equipment match boost: `+4.0`.
+- Section boost: `+0.25` for safety, troubleshooting, and escalation sections.
 
 ### `POST /reindex`
 
-Reloads `document/SOP.md` and rebuilds the in-memory index. This is helpful for a local demo.
-
-Request schema: none.
-
-Response schema: `ReindexResponse`
-
-```json
-{
-  "status": "ok",
-  "sop_path": "/app/document/SOP.md",
-  "chunks_indexed": 40
-}
-```
+Reloads `document/SOP.md` and rebuilds the in-memory index.
 
 ### `GET /health`
 
-Response schema: `HealthResponse`
+Returns SOP load status and indexed chunk count.
 
-```json
-{
-  "service": "rag-retrieval",
-  "status": "ok",
-  "dependencies": {
-    "sop_loaded": true,
-    "chunks_indexed": 40
-  }
-}
-```
-
-## 5. LLM Reasoning Service
+## 6. LLM Reasoning Service
 
 FastAPI title: `LLM Reasoning Service`
 
-Base URL:
+Base URLs:
 
 - Local host: `http://localhost:8002`
 - Docker network: `http://llm-reasoning:8002`
 
-Tags:
-
-- `reasoning`
-- `health`
-
 ### `POST /generate`
 
-Builds a grounded prompt from the question, SOP context, and structured mock data. Calls the configured LLM provider and returns a structured troubleshooting answer.
+Builds a grounded prompt, calls the local MLX model endpoint, parses model JSON, and normalizes the structured answer.
 
 Request schema: `GenerateRequest`
 
@@ -296,12 +289,12 @@ Request schema: `GenerateRequest`
   "question": "CVD-05 triggered GAS012 during deposition. Should I escalate?",
   "sop_context": [
     {
-      "chunk_id": "SOP-CVD-003:escalation",
+      "chunk_id": "SOP-CVD-003:escalation-criteria",
       "source_id": "SOP-CVD-003",
       "title": "CVD Gas Flow Deviation - Alarm GAS012",
       "section": "Escalation Criteria",
-      "content": "Any gas safety concern exists. Downtime exceeds 20 minutes for high-severity gas alarm.",
-      "score": 0.95
+      "content": "- Any gas safety concern exists.",
+      "score": 13.0
     }
   ],
   "structured_context": {
@@ -327,178 +320,75 @@ Response schema: `GenerateResponse`
 ```json
 {
   "answer": {
+    "direct_response": null,
+    "action_decision": {
+      "primary_action": "Escalate and verify gas flow deviation conditions.",
+      "escalate": "Yes",
+      "reason": "GAS012 is high severity and gas-related alarms are high priority."
+    },
     "issue_summary": {
       "equipment": "CVD-05",
       "alarm_or_symptom": "GAS012",
       "severity": "High"
     },
-    "relevant_sop_context": [
-      {
-        "source_id": "SOP-CVD-003",
-        "title": "CVD Gas Flow Deviation - Alarm GAS012",
-        "section": "Escalation Criteria"
-      }
-    ],
-    "recommended_checks": [
-      "Compare MFC actual reading with recipe target.",
-      "Check gas supply pressure and facility gas status."
-    ],
-    "safety_precautions": [
-      "Treat gas-related alarms as high priority.",
-      "Do not bypass gas interlocks."
-    ],
-    "escalation_criteria": [
-      "Escalate if any gas safety concern exists.",
-      "Escalate if MFC drift or leak is suspected."
-    ],
+    "relevant_sop_context": [],
+    "recommended_checks": [],
+    "likely_causes": [],
+    "recovery_next_steps": [],
+    "safety_precautions": [],
+    "escalation_criteria": [],
     "uncertainty": []
   },
   "model": "LiquidAI/LFM2.5-1.2B-Instruct",
   "usage": {
-    "input_tokens": 1200,
-    "output_tokens": 350
+    "input_tokens": 676,
+    "output_tokens": 304
   },
   "warnings": []
 }
 ```
 
-Status codes:
+LLM logging:
 
-| Code | Meaning |
-| --- | --- |
-| `200` | LLM answer generated and parsed. |
-| `400` | Missing question or missing SOP context. |
-| `503` | LLM provider unavailable or timed out. |
+- `llm_provider_request` logs model settings and messages.
+- `llm_provider_response` logs raw model content and usage.
+- `llm_provider_error` logs provider or parse errors.
+- `LLM_API_KEY` is not logged.
 
 ### `GET /health`
 
-Response schema: `HealthResponse`
+Returns provider configuration status and model name.
 
-```json
-{
-  "service": "llm-reasoning",
-  "status": "ok",
-  "dependencies": {
-    "provider_configured": true,
-    "provider_type": "local_mlx",
-    "model": "LiquidAI/LFM2.5-1.2B-Instruct"
-  }
-}
-```
-
-The local MLX endpoint should be reported as configured, but secrets should not be exposed in this response.
-
-## 6. Mock Data Service
+## 7. Mock Data Service
 
 FastAPI title: `Mock Data Service`
 
-Base URL:
+Base URLs:
 
 - Local host: `http://localhost:8003`
 - Docker network: `http://mock-data:8003`
 
-Tags:
-
-- `equipment`
-- `alarms`
-- `incidents`
-- `lookup`
-- `health`
-
 ### `GET /equipment/{equipment_name}`
 
-Looks up equipment by display name.
-
-Example:
-
-```text
-GET /equipment/Etcher-03
-```
-
-Response schema: `Equipment`
-
-```json
-{
-  "equipment_id": "EQ001",
-  "equipment_name": "Etcher-03",
-  "tool_type": "Plasma Etcher",
-  "area": "Etch",
-  "status": "Active"
-}
-```
-
-Status codes:
-
-| Code | Meaning |
-| --- | --- |
-| `200` | Equipment found. |
-| `404` | Equipment not found. |
+Looks up one equipment record.
 
 ### `GET /alarms/{alarm_code}`
 
-Looks up an alarm by alarm code.
-
-Example:
-
-```text
-GET /alarms/RF101
-```
-
-Response schema: `Alarm`
-
-```json
-{
-  "alarm_code": "RF101",
-  "description": "RF Power Instability",
-  "severity": "High"
-}
-```
-
-Status codes:
-
-| Code | Meaning |
-| --- | --- |
-| `200` | Alarm found. |
-| `404` | Alarm not found. |
+Looks up one alarm record.
 
 ### `GET /incidents`
 
-Finds historical incidents by optional query filters.
-
 Query parameters:
 
-| Parameter | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- |
-| `equipment` | string | no | `null` | Equipment name filter. |
-| `alarm_code` | string | no | `null` | Alarm code filter. |
-| `limit` | integer | no | `5` | Maximum incidents to return. |
-
-Example:
-
-```text
-GET /incidents?equipment=Etcher-03&alarm_code=RF101&limit=5
-```
-
-Response schema: `IncidentList`
-
-```json
-{
-  "incidents": [
-    {
-      "incident_id": "H001",
-      "date": "2026-06-01",
-      "equipment": "Etcher-03",
-      "alarm_code": "RF101",
-      "root_cause": "Loose RF cable",
-      "corrective_action": "Tightened RF connector and verified reflected power"
-    }
-  ]
-}
-```
+| Parameter | Type | Required | Default |
+| --- | --- | --- | --- |
+| `equipment` | string | no | `null` |
+| `alarm_code` | string | no | `null` |
+| `limit` | integer | no | `5` |
 
 ### `POST /lookup`
 
-Combined lookup endpoint used by Chat API to reduce service-to-service round trips.
+Combined lookup endpoint used by Chat API.
 
 Request schema: `LookupRequest`
 
@@ -527,86 +417,21 @@ Response schema: `LookupResponse`
     "description": "RF Power Instability",
     "severity": "High"
   },
-  "incidents": [
-    {
-      "incident_id": "H001",
-      "date": "2026-06-01",
-      "equipment": "Etcher-03",
-      "alarm_code": "RF101",
-      "root_cause": "Loose RF cable",
-      "corrective_action": "Tightened RF connector and verified reflected power"
-    }
-  ],
+  "incidents": [],
   "missing": []
 }
 ```
 
-The `missing` array can contain `equipment`, `alarm`, or `incidents`.
-
-Status codes:
-
-| Code | Meaning |
-| --- | --- |
-| `200` | Lookup completed. Missing records are reported in the body. |
-| `400` | Neither equipment nor alarm code was provided. |
+The `missing` array can include `equipment`, `alarm`, or `incidents`.
 
 ### `GET /health`
 
-Response schema: `HealthResponse`
+Returns equipment, alarm, and incident record counts.
 
-```json
-{
-  "service": "mock-data",
-  "status": "ok",
-  "dependencies": {
-    "equipment_records": 5,
-    "alarm_records": 8,
-    "incident_records": 6
-  }
-}
-```
+## 8. Operational Notes
 
-## 7. Shared Schema Names
-
-Use these shared model names across services where possible to keep Swagger readable:
-
-| Schema | Used By | Purpose |
-| --- | --- | --- |
-| `HealthResponse` | All services | Health and dependency status. |
-| `ErrorResponse` | All services | Consistent error shape. |
-| `SourceReference` | Chat API, LLM Reasoning | SOP/data citation. |
-| `SopContextChunk` | RAG Retrieval, LLM Reasoning | Retrieved SOP chunk. |
-| `Equipment` | Mock Data, LLM Reasoning | Equipment master record. |
-| `Alarm` | Mock Data, LLM Reasoning | Alarm reference record. |
-| `Incident` | Mock Data, LLM Reasoning | Historical incident record. |
-| `TroubleshootingAnswer` | Chat API, LLM Reasoning | Structured chatbot answer. |
-
-## 8. FastAPI Implementation Pattern
-
-Each endpoint should include `response_model`, `summary`, `description`, and `tags` so Swagger is useful during the interview demo.
-
-```python
-@router.post(
-    "/search",
-    response_model=SearchResponse,
-    tags=["retrieval"],
-    summary="Search SOP context",
-    description="Returns the most relevant SOP chunks for a troubleshooting question.",
-)
-async def search(request: SearchRequest) -> SearchResponse:
-    ...
-```
-
-Service clients should call internal Docker network URLs:
-
-```text
-http://rag-retrieval:8001/search
-http://llm-reasoning:8002/generate
-http://mock-data:8003/lookup
-```
-
-The public demo should only need to call:
-
-```text
-http://localhost:8000/chat
-```
+- Local MLX model URL defaults to `http://host.docker.internal:8080/v1` in Docker.
+- Chat API timeout should be greater than LLM Reasoning model timeout.
+- Logs are written under `logs/` when using Docker Compose.
+- Direct frontend users should open `http://localhost:8000/`.
+- API testers can use `http://localhost:8000/chat` for structured responses or `http://localhost:8000/api/chat` for FE-formatted responses.

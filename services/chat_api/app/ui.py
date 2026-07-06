@@ -417,7 +417,7 @@ UI_HTML = """
             <button type="button" class="sample" data-q="Etcher-03 triggered RF101 during plasma ignition. What should I check first?">RF101 first checks</button>
             <button type="button" class="sample" data-q="CMP-02 has low pad pressure. What are the likely causes and recovery steps?">CMP low pressure</button>
             <button type="button" class="sample" data-q="CVD-05 triggered GAS012 during deposition. Should I escalate?">GAS012 escalation</button>
-            <button type="button" class="sample" data-q="Etcher-03 had RF101 three times this week. What should be escalated?">Repeated RF101</button>
+            <button type="button" class="sample" data-q="PVD-02 triggered VAC033 during pump-down. What should I check?">VAC033 pump-down</button>
           </div>
           <form id="chat-form">
             <textarea id="chat-input" placeholder="Ask a troubleshooting question..."></textarea>

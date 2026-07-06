@@ -28,6 +28,8 @@ LiquidAI/LFM2.5-1.2B-Instruct
 | `document/TECHNICAL_DESIGN.md` | High-level technical design and diagrams. |
 | `document/ROADMAP.md` | 10-day delivery roadmap. |
 | `document/API_CONTRACTS.md` | Human-readable API contract notes. |
+| `document/DEPLOYMENT.md` | Mac/Windows deployment guide and model setup notes. |
+| `document/SAMPLE_QUESTIONS_AND_ANSWERS.md` | Demo questions with expected frontend answers. |
 | `openapi/*.openapi.yaml` | Real OpenAPI/Swagger specs for each service. |
 | `.env.example` | Example environment configuration. |
 
@@ -39,10 +41,18 @@ Create an environment file:
 cp .env.example .env
 ```
 
-Make sure your LiquidAI model is already running locally through MLX. If the MLX server is running on your Mac at port `8080`, keep this value in `.env` for Docker:
+Make sure an OpenAI-compatible model endpoint is running. On Mac, the recommended local path is MLX. If the MLX server is running on your Mac at port `8080`, keep this value in `.env` for Docker:
 
 ```text
 LLM_BASE_URL=http://host.docker.internal:8080/v1
+```
+
+On Windows, the recommended local path is Ollama. If Ollama is running on Windows at port `11434`, use:
+
+```text
+LLM_BASE_URL=http://host.docker.internal:11434/v1
+LLM_MODEL=<your-ollama-model-name>
+LLM_API_KEY=ollama
 ```
 
 Then start the services:
@@ -95,7 +105,7 @@ Each log file includes service startup time and API request/response payloads.
 
 ## Model Configuration
 
-Copy `.env.example` to `.env` and configure your inference endpoint:
+Copy `.env.example` to `.env` and configure your inference endpoint. Mac MLX example:
 
 ```text
 LLM_BASE_URL=http://host.docker.internal:8080/v1
@@ -103,7 +113,15 @@ LLM_MODEL=LiquidAI/LFM2.5-1.2B-Instruct
 LLM_API_KEY=
 ```
 
-`LLM_API_KEY` is optional for local MLX. Leave it empty if your local model server does not require authentication.
+Windows Ollama example:
+
+```text
+LLM_BASE_URL=http://host.docker.internal:11434/v1
+LLM_MODEL=<your-ollama-model-name>
+LLM_API_KEY=ollama
+```
+
+`LLM_API_KEY` is optional for local MLX. Ollama's OpenAI-compatible endpoint accepts a placeholder key such as `ollama`.
 
 ## Current Status
 

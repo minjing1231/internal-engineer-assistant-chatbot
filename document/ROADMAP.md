@@ -13,7 +13,7 @@ This roadmap explains how the take-home assignment will be delivered within the 
 | Day 3 | Feature development | Implement CSV data lookup, SOP ingestion/chunking, retrieval ranking, orchestration flow, and LLM provider integration using `LiquidAI/LFM2.5-1.2B-Instruct`. |
 | Day 4 | End-to-end behavior | Connect all services through Docker Compose. Implement graceful handling for unknown equipment, unknown alarms, ID mismatch suggestions, missing SOP context, and LLM failures. |
 | Day 5 | Unit testing | Add unit tests for SOP parsing, retrieval ranking, CSV loading, data lookup, prompt construction, and response formatting. |
-| Day 6 | Integration testing | Run full workflow tests across services using the required example questions. Verify source references, uncertainty handling, and fallback behavior. |
+| Day 6 | Integration testing | Run full workflow tests across services using the required example questions. Verify retrieved context, uncertainty handling, ID guardrails, and fallback behavior. |
 | Day 7 | RAG and response tuning | Tune retrieval scoring, prompt wording, standard answer format, ID guardrails, and safety/escalation behavior based on test results. |
 | Day 8 | Documentation polish | Update README, technical design, API/Swagger docs, setup instructions, known limitations, and `SAMPLE_QUESTIONS_AND_ANSWERS.md`. |
 | Day 9 | Demo preparation | Prepare a 5-10 minute demo script, rehearse the walkthrough, verify clean local setup, and record the demo video. |

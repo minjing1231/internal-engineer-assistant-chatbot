@@ -272,7 +272,7 @@ UI_HTML = """
     }
     .sample-wrap {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 7px;
       margin-bottom: 10px;
     }
@@ -414,10 +414,9 @@ UI_HTML = """
             Sample questions <span id="sample-toggle-label">Show</span>
           </button>
           <div class="sample-wrap" id="sample-wrap" hidden>
-            <button type="button" class="sample" data-q="Etcher-03 triggered RF101 during plasma ignition. What should I check first?">RF101 first checks</button>
-            <button type="button" class="sample" data-q="CMP-02 has low pad pressure. What are the likely causes and recovery steps?">CMP low pressure</button>
-            <button type="button" class="sample" data-q="CVD-05 triggered GAS012 during deposition. Should I escalate?">GAS012 escalation</button>
-            <button type="button" class="sample" data-q="PVD-02 triggered VAC033 during pump-down. What should I check?">VAC033 pump-down</button>
+            <button type="button" class="sample" data-q="Etcher-03 triggered RF101 during plasma ignition. What should I check first?">Sample Question 1</button>
+            <button type="button" class="sample" data-q="CVD-05 triggered GAS012 during deposition. Should I escalate?">Sample Question 2</button>
+            <button type="button" class="sample" data-q="CVD-05 triggered GAS0 during deposition. Should I escalate?">Sample Question 3</button>
           </div>
           <form id="chat-form">
             <textarea id="chat-input" placeholder="Ask a troubleshooting question..."></textarea>
